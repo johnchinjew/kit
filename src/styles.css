@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@source "..";
+
+@layer base {
+  :root {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #373735;
+    background: #fff;
+    font-synthesis: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid #53534c;
+    outline-offset: 4px;
+  }
+
+  input[type="radio"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: #373735;
+  }
+}
