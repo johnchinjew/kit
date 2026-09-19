@@ -1,21 +1,26 @@
 {
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "vite build",
     "check": "npm run format:check && npm test",
-    "clean": "node scripts/clean.js",
+    "dev": "vite --host",
     "format": "elm-format src tests --yes",
     "format:check": "elm-format src tests --validate",
-    "serve": "node scripts/serve.js",
     "test": "elm-test"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.3",
     "elm": "^0.19.2-0",
     "elm-format": "^0.8.8",
     "elm-test": "^0.19.2-1",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0",
+    "vite-plugin-elm": "^3.0.1",
+    "vite-plugin-pwa": "^1.3.0"
   },
   "allowScripts": {
     "elm@0.19.2-0": true,

@@ -18,4 +18,4 @@ The persistence architecture supports offline writes, intuitive conflict resolut
 - Use Firestore's persistent local cache to queue offline writes. When the client is online, queued edits are only
   accepted if they are the chronologically latest edit.
 - Use Firestore Security Rules to ensure the resource exists on the server for edits and deletes, and, the UUID is
-  absent for creates. Deletes remove resources immediately, without tombstones or cleanup.
+  absent for creates. Deletes remove resources without any tombstone mechanism.
