@@ -2,8 +2,9 @@ Refer to the project README for essential context.
 
 ## Git
 
-After completing or updating any work that should be committed, include a suggested commit message in your reply.
-Don't proactivley commit changes or amend existing commits unless explicitly requested.
+After completing or updating any work that should be committed, include a suggested commit message in your reply
+matching the commit conventions of the project. Don't proactivley commit changes or amend existing commits unless
+explicitly requested.
 
 ## Elm
 

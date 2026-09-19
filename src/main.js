@@ -29,6 +29,4 @@ if (import.meta.env.MODE === "emulator") {
   connectFirestoreEmulator(getFirestore(), window.location.hostname, 8080);
 }
 
-Elm.Main.init({
-  node: document.getElementById("app"),
-});
+Elm.Main.init();
