@@ -9,6 +9,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "prompt",
+      workbox: {
+        navigateFallbackDenylist: [/^\/__/],
+      },
       includeAssets: ["assets/favicon.png"],
       manifest: {
         name: "Kit",

@@ -1,6 +1,14 @@
 import { Elm } from "./Main.elm";
 import { initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth } from "firebase/auth";
+import {
+  connectAuthEmulator,
+  getAuth,
+  getRedirectResult,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithRedirect,
+  signOut,
+} from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { registerSW } from "virtual:pwa-register";
 
@@ -29,4 +37,34 @@ if (import.meta.env.MODE === "emulator") {
   connectFirestoreEmulator(getFirestore(), window.location.hostname, 8080);
 }
 
-Elm.Main.init();
+const app = Elm.Main.init();
+
+try {
+  await getRedirectResult(getAuth());
+} catch (error) {
+  app.ports.signInFailed.send(error.code || "auth/unknown");
+}
+
+onAuthStateChanged(getAuth(), (user) => {
+  if (user) {
+    app.ports.authChanged.send({ photoUrl: user.photoURL });
+  } else {
+    app.ports.authChanged.send(null);
+  }
+});
+
+app.ports.signIn.subscribe(async () => {
+  try {
+    await signInWithRedirect(getAuth(), new GoogleAuthProvider());
+  } catch (error) {
+    app.ports.signInFailed.send(error.code || "auth/unknown");
+  }
+});
+
+app.ports.signOut.subscribe(async () => {
+  try {
+    await signOut(getAuth());
+  } catch (error) {
+    app.ports.signOutFailed.send(error.code || "auth/unknown");
+  }
+});

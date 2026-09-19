@@ -3,8 +3,9 @@ Refer to the project README for essential context.
 ## Git
 
 After completing or updating any work that should be committed, include a suggested commit message in your reply
-matching the commit conventions of the project. Don't proactivley commit changes or amend existing commits unless
-explicitly requested.
+matching the commit conventions of the project.
+
+Don't proactivley commit changes or amend existing commits unless explicitly requested.
 
 ## Elm
 
@@ -12,12 +13,18 @@ Use import `exposing` for types only, such as `import Html exposing (Html)`. Cal
 module names, such as `Html.div`. If importing a multi-segment module prefer to alias the last segment, such as
 `import Html.Attributes as Attributes`.
 
+Prefer named ports per operation/event. Consolidate ports only to share behavior, not reduce port count.
+Instead of managing per-operation IDs, prefer one pending operation per port. This means ignoring new requests in
+`update` until the pending request finishes and all response handling is applied.
+
 ## Tests
 
 Test tricky domain logic such as date and recurrence behavior. Test tricky persistence logic such as decoding and
 versioning. Add regression tests whenever a bug is found. Don't bother testing every UI detail or chasing coverage for
-its own sake. Prefer self-contained tests and tolerate modest setup duplication. Do not introduce test helpers solely to
-deduplicate small amounts of setup.
+its own sake.
+
+Prefer self-contained tests and tolerate modest setup duplication. Do not introduce test helpers solely to deduplicate
+small amounts of setup.
 
 ## Documentation
 
