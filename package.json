@@ -2,21 +2,26 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "build": "vite build",
     "check": "npm run format:check && npm test",
     "dev": "vite --host",
+    "emulators": "firebase emulators:start",
     "format": "elm-format src tests --yes",
     "format:check": "elm-format src tests --validate",
-    "test": "elm-test"
+    "test": "npm run test:elm && npm run test:firebase",
+    "test:elm": "elm-test",
+    "test:firebase": "firebase emulators:exec --project demo-kit-tasks \"node --test \\\"tests/**/*.firebase.test.js\\\"\""
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "elm": "^0.19.2-0",
     "elm-format": "^0.8.8",
     "elm-test": "^0.19.2-1",
+    "firebase-tools": "^15.30.2",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.0",
     "vite-plugin-elm": "^3.0.1",
@@ -25,5 +30,8 @@
   "allowScripts": {
     "elm@0.19.2-0": true,
     "elm-format@0.8.8": true
+  },
+  "dependencies": {
+    "firebase": "^12.19.0"
   }
 }

@@ -17,7 +17,11 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
       - run: npm ci
       - run: npm run check
       - run: npm run build
@@ -25,3 +29,8 @@ jobs:
         with:
           path: dist
       - uses: actions/deploy-pages@v4
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: kit-tasks
+          credentials_json: ${{ secrets.SERVICE_ACCOUNT_CREDENTIALS_JSON }}
+      - run: npx firebase deploy --non-interactive
