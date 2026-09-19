@@ -1,5 +1,7 @@
 .DS_Store
-dist/
-elm-stuff/
+*.log
+gha-creds-*.json
+.firebase/
 node_modules/
-npm-debug.log
+elm-stuff/
+dist/

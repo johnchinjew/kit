@@ -3,25 +3,23 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
       - run: npm ci
       - run: npm run check
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v4
+      - uses: google-github-actions/auth@v3
         with:
-          path: dist
-      - uses: actions/deploy-pages@v4
+          project_id: kit-tasks
+          credentials_json: ${{ secrets.FIREBASE_DEPLOYER_CREDENTIALS_JSON }}
+      - run: npx firebase deploy --non-interactive
