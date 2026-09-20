@@ -7,7 +7,7 @@
   "scripts": {
     "build": "vite build",
     "check": "npm run format:check && npm test",
-    "dev": "node scripts/dev.js",
+    "dev": "npm run dev:build & npm run dev:emulators & wait",
     "dev:build": "vite build --watch --mode emulator",
     "dev:emulators": "firebase emulators:start",
     "format": "elm-format src tests --yes",
