@@ -37,12 +37,12 @@ main =
 
 
 type alias Model =
-    { authStatus : AuthStatus
+    { session : Session
     , noticeState : NoticeState
     }
 
 
-type AuthStatus
+type Session
     = CheckingAuth
     | SigningIn
     | SignedIn User
@@ -56,12 +56,12 @@ type alias User =
 
 isSignedOut : Model -> Bool
 isSignedOut model =
-    model.authStatus == SignedOut
+    model.session == SignedOut
 
 
 isSignedIn : Model -> Bool
 isSignedIn model =
-    case model.authStatus of
+    case model.session of
         SignedIn _ ->
             True
 
@@ -71,7 +71,7 @@ isSignedIn model =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { authStatus = CheckingAuth
+    ( { session = CheckingAuth
       , noticeState = NoticeState.empty
       }
     , Cmd.none
@@ -95,52 +95,52 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SignInClicked ->
-            case model.authStatus of
+            case model.session of
                 SignedOut ->
-                    ( { model | authStatus = SigningIn }, signIn () )
+                    ( { model | session = SigningIn }, signIn () )
 
                 _ ->
                     ( model, Cmd.none )
 
         SignInFailed code ->
-            case model.authStatus of
+            case model.session of
                 CheckingAuth ->
                     ( model, Cmd.none )
                         |> showNotice (signInErrorMessage code)
 
                 SigningIn ->
-                    ( { model | authStatus = SignedOut }, Cmd.none )
+                    ( { model | session = SignedOut }, Cmd.none )
                         |> showNotice (signInErrorMessage code)
 
                 _ ->
                     ( model, Cmd.none )
 
         SignOutClicked ->
-            case model.authStatus of
+            case model.session of
                 SignedIn user ->
-                    ( { model | authStatus = SigningOut user }, signOut () )
+                    ( { model | session = SigningOut user }, signOut () )
 
                 _ ->
                     ( model, Cmd.none )
 
         SignOutFailed code ->
-            case model.authStatus of
+            case model.session of
                 SigningOut user ->
-                    ( { model | authStatus = SignedIn user }, Cmd.none )
+                    ( { model | session = SignedIn user }, Cmd.none )
                         |> showNotice (signOutErrorMessage code)
 
                 _ ->
                     ( model, Cmd.none )
 
         AuthChanged user ->
-            ( { model | authStatus = authStatusFromUser user }, Cmd.none )
+            ( { model | session = sessionFromUser user }, Cmd.none )
 
         NoticeExpired noticeId ->
             ( { model | noticeState = NoticeState.expire noticeId model.noticeState }, Cmd.none )
 
 
-authStatusFromUser : Maybe User -> AuthStatus
-authStatusFromUser maybeUser =
+sessionFromUser : Maybe User -> Session
+sessionFromUser maybeUser =
     case maybeUser of
         Just user ->
             SignedIn user
@@ -204,18 +204,18 @@ view : Model -> Document Msg
 view model =
     { title = "Kit"
     , body =
-        [ authStatusSummary model.authStatus
+        [ sessionSummary model.session
         , signInButton model
         , signOutButton model
         ]
-            ++ profilePhoto model.authStatus
+            ++ profilePhoto model.session
             ++ notice model.noticeState.current
     }
 
 
-authStatusSummary : AuthStatus -> Html.Html Msg
-authStatusSummary authStatus =
-    case authStatus of
+sessionSummary : Session -> Html.Html Msg
+sessionSummary session =
+    case session of
         CheckingAuth ->
             Html.h1 [] [ Html.text "CheckingAuth" ]
 
@@ -252,9 +252,9 @@ signOutButton model =
         [ Html.text "Sign out" ]
 
 
-profilePhoto : AuthStatus -> List (Html.Html msg)
-profilePhoto authStatus =
-    case authStatus of
+profilePhoto : Session -> List (Html.Html msg)
+profilePhoto session =
+    case session of
         SignedIn user ->
             profilePhotoImg user.photoUrl
 
