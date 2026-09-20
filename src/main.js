@@ -14,10 +14,16 @@ import { registerSW } from "virtual:pwa-register";
 
 import "./styles.css";
 
+if (window.location.hostname === "kit-tasks.firebaseapp.com") {
+  const url = new URL(window.location.href);
+  url.hostname = "kit-tasks.web.app";
+  window.location.replace(url.href);
+}
+
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    if (window.confirm("A new version of Kit is available. Reload now to update?")) {
+    if (window.confirm("A new version of Kit is available. Update now?")) {
       updateSW();
     }
   },
@@ -25,7 +31,7 @@ const updateSW = registerSW({
 
 initializeApp({
   apiKey: "AIzaSyBhruL_bC6C7mlBlvIvT76lzFQ69VjqJis",
-  authDomain: "kit-tasks.firebaseapp.com",
+  authDomain: "kit-tasks.web.app",
   projectId: "kit-tasks",
   storageBucket: "kit-tasks.firebasestorage.app",
   messagingSenderId: "723040117824",
