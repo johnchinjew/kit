@@ -12,7 +12,7 @@ export default defineConfig({
       workbox: {
         navigateFallbackDenylist: [/^\/__/],
       },
-      includeAssets: ["assets/favicon.png"],
+      includeAssets: ["assets/**/*"],
       manifest: {
         name: "Kit",
         short_name: "Kit",
