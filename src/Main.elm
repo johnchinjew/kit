@@ -4,7 +4,7 @@ import Browser exposing (Document)
 import Html
 import Html.Attributes as Attributes
 import Html.Events as Events
-import Message
+import NoticeState exposing (Notice, NoticeState)
 
 
 port signIn : () -> Cmd msg
@@ -38,7 +38,7 @@ main =
 
 type alias Model =
     { authStatus : AuthStatus
-    , errorMessage : Maybe String
+    , noticeState : NoticeState
     }
 
 
@@ -48,6 +48,10 @@ type AuthStatus
     | SignedIn User
     | SigningOut User
     | SignedOut
+
+
+type alias User =
+    { photoUrl : Maybe String }
 
 
 isSignedOut : Model -> Bool
@@ -65,14 +69,10 @@ isSignedIn model =
             False
 
 
-type alias User =
-    { photoUrl : Maybe String }
-
-
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { authStatus = CheckingAuth
-      , errorMessage = Nothing
+      , noticeState = NoticeState.empty
       }
     , Cmd.none
     )
@@ -88,6 +88,7 @@ type Msg
     | SignOutClicked
     | SignOutFailed String
     | AuthChanged (Maybe User)
+    | NoticeExpired Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -96,7 +97,7 @@ update msg model =
         SignInClicked ->
             case model.authStatus of
                 SignedOut ->
-                    ( { model | authStatus = SigningIn, errorMessage = Nothing }, signIn () )
+                    ( { model | authStatus = SigningIn }, signIn () )
 
                 _ ->
                     ( model, Cmd.none )
@@ -104,10 +105,12 @@ update msg model =
         SignInFailed code ->
             case model.authStatus of
                 CheckingAuth ->
-                    ( { model | errorMessage = Just (signInErrorMessage code) }, Cmd.none )
+                    ( model, Cmd.none )
+                        |> showNotice (signInErrorMessage code)
 
                 SigningIn ->
-                    ( { model | authStatus = SignedOut, errorMessage = Just (signInErrorMessage code) }, Cmd.none )
+                    ( { model | authStatus = SignedOut }, Cmd.none )
+                        |> showNotice (signInErrorMessage code)
 
                 _ ->
                     ( model, Cmd.none )
@@ -115,7 +118,7 @@ update msg model =
         SignOutClicked ->
             case model.authStatus of
                 SignedIn user ->
-                    ( { model | authStatus = SigningOut user, errorMessage = Nothing }, signOut () )
+                    ( { model | authStatus = SigningOut user }, signOut () )
 
                 _ ->
                     ( model, Cmd.none )
@@ -123,13 +126,17 @@ update msg model =
         SignOutFailed code ->
             case model.authStatus of
                 SigningOut user ->
-                    ( { model | authStatus = SignedIn user, errorMessage = Just (signOutErrorMessage code) }, Cmd.none )
+                    ( { model | authStatus = SignedIn user }, Cmd.none )
+                        |> showNotice (signOutErrorMessage code)
 
                 _ ->
                     ( model, Cmd.none )
 
         AuthChanged user ->
             ( { model | authStatus = authStatusFromUser user }, Cmd.none )
+
+        NoticeExpired noticeId ->
+            ( { model | noticeState = NoticeState.expire noticeId model.noticeState }, Cmd.none )
 
 
 authStatusFromUser : Maybe User -> AuthStatus
@@ -165,6 +172,17 @@ signOutErrorMessage code =
             "Could not sign out. Please try again."
 
 
+showNotice : String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+showNotice message ( model, cmd ) =
+    let
+        ( noticeState, noticeCmd ) =
+            NoticeState.set NoticeExpired message model.noticeState
+    in
+    ( { model | noticeState = noticeState }
+    , Cmd.batch [ cmd, noticeCmd ]
+    )
+
+
 
 -- SUBSCRIPTIONS
 
@@ -186,13 +204,12 @@ view : Model -> Document Msg
 view model =
     { title = "Kit"
     , body =
-        [ Html.h1 [] [ Html.text Message.message ]
-        , authStatusSummary model.authStatus
+        [ authStatusSummary model.authStatus
         , signInButton model
         , signOutButton model
         ]
             ++ profilePhoto model.authStatus
-            ++ errorMessage model.errorMessage
+            ++ notice model.noticeState.current
     }
 
 
@@ -258,11 +275,11 @@ profilePhotoImg maybePhotoUrl =
     ]
 
 
-errorMessage : Maybe String -> List (Html.Html msg)
-errorMessage maybeMessage =
-    case maybeMessage of
-        Just message ->
-            [ Html.p [] [ Html.text message ] ]
+notice : Maybe Notice -> List (Html.Html msg)
+notice maybeNotice =
+    case maybeNotice of
+        Just currentNotice ->
+            [ Html.p [] [ Html.text currentNotice.message ] ]
 
         Nothing ->
             []
