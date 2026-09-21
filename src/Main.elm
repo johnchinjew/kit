@@ -5,8 +5,7 @@ import Html
 import Html.Attributes as Attributes
 import Html.Events as Events
 import NoticeState exposing (Notice, NoticeState)
-import Ports
-import User exposing (User)
+import Session exposing (Session)
 
 
 main : Program () Model Msg
@@ -29,32 +28,9 @@ type alias Model =
     }
 
 
-type Session
-    = CheckingAuth
-    | SigningIn
-    | SignedIn User
-    | SigningOut User
-    | SignedOut
-
-
-isSignedOut : Model -> Bool
-isSignedOut model =
-    model.session == SignedOut
-
-
-isSignedIn : Model -> Bool
-isSignedIn model =
-    case model.session of
-        SignedIn _ ->
-            True
-
-        _ ->
-            False
-
-
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { session = CheckingAuth
+    ( { session = Session.init
       , noticeState = NoticeState.empty
       }
     , Cmd.none
@@ -67,10 +43,8 @@ init _ =
 
 type Msg
     = SignInClicked
-    | SignInFailed String
     | SignOutClicked
-    | SignOutFailed String
-    | AuthChanged (Maybe User)
+    | SessionMsg Session.Msg
     | NoticeStateMsg NoticeState.Msg
 
 
@@ -78,87 +52,39 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SignInClicked ->
-            case model.session of
-                SignedOut ->
-                    ( { model | session = SigningIn }, Ports.signIn () )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        SignInFailed code ->
-            case model.session of
-                CheckingAuth ->
-                    model |> showNotice (signInErrorMessage code)
-
-                SigningIn ->
-                    { model | session = SignedOut }
-                        |> showNotice (signInErrorMessage code)
-
-                _ ->
-                    ( model, Cmd.none )
+            Session.signIn model.session |> handleSessionOutcome model
 
         SignOutClicked ->
-            case model.session of
-                SignedIn user ->
-                    ( { model | session = SigningOut user }, Ports.signOut () )
+            Session.signOut model.session |> handleSessionOutcome model
 
-                _ ->
-                    ( model, Cmd.none )
-
-        SignOutFailed code ->
-            case model.session of
-                SigningOut user ->
-                    { model | session = SignedIn user }
-                        |> showNotice (signOutErrorMessage code)
-
-                _ ->
-                    ( model, Cmd.none )
-
-        AuthChanged user ->
-            ( { model | session = sessionFromUser user }, Cmd.none )
+        SessionMsg sessionMsg ->
+            Session.update sessionMsg model.session |> handleSessionOutcome model
 
         NoticeStateMsg noticeMsg ->
             NoticeState.update noticeMsg model.noticeState
                 |> handleNoticeStateOutcome model
 
 
-sessionFromUser : Maybe User -> Session
-sessionFromUser maybeUser =
-    case maybeUser of
-        Just user ->
-            SignedIn user
+handleSessionOutcome : Model -> ( Session, Maybe Session.Notice, Cmd Session.Msg ) -> ( Model, Cmd Msg )
+handleSessionOutcome model ( session, maybeNotice, sessionCmd ) =
+    let
+        modelWithSession =
+            { model | session = session }
 
+        cmdFromSession =
+            Cmd.map SessionMsg sessionCmd
+    in
+    case maybeNotice of
         Nothing ->
-            SignedOut
+            ( modelWithSession, cmdFromSession )
 
-
-signInErrorMessage : String -> String
-signInErrorMessage code =
-    case code of
-        "auth/network-request-failed" ->
-            "Could not sign in. Check your connection and try again later."
-
-        "auth/user-disabled" ->
-            "Account has been disabled."
-
-        _ ->
-            "Could not sign in. Please try again later."
-
-
-signOutErrorMessage : String -> String
-signOutErrorMessage code =
-    case code of
-        "auth/network-request-failed" ->
-            "Could not sign out. Check your connection and try again."
-
-        _ ->
-            "Could not sign out. Please try again."
-
-
-showNotice : String -> Model -> ( Model, Cmd Msg )
-showNotice message model =
-    NoticeState.set message model.noticeState
-        |> handleNoticeStateOutcome model
+        Just sessionNotice ->
+            let
+                ( modelWithNotice, cmdFromNotice ) =
+                    NoticeState.set sessionNotice.message modelWithSession.noticeState
+                        |> handleNoticeStateOutcome modelWithSession
+            in
+            ( modelWithNotice, Cmd.batch [ cmdFromSession, cmdFromNotice ] )
 
 
 handleNoticeStateOutcome : Model -> ( NoticeState, Cmd NoticeState.Msg ) -> ( Model, Cmd Msg )
@@ -174,11 +100,7 @@ handleNoticeStateOutcome model ( noticeState, noticeCmd ) =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch
-        [ Ports.authChanged AuthChanged
-        , Ports.signInFailed SignInFailed
-        , Ports.signOutFailed SignOutFailed
-        ]
+    Sub.map SessionMsg Session.subscriptions
 
 
 
@@ -201,19 +123,19 @@ view model =
 sessionSummary : Session -> Html.Html Msg
 sessionSummary session =
     case session of
-        CheckingAuth ->
+        Session.CheckingAuth ->
             Html.h1 [] [ Html.text "CheckingAuth" ]
 
-        SigningIn ->
+        Session.SigningIn ->
             Html.h1 [] [ Html.text "SigningIn" ]
 
-        SignedIn _ ->
+        Session.SignedIn _ ->
             Html.h1 [] [ Html.text "SignedIn" ]
 
-        SigningOut _ ->
+        Session.SigningOut _ ->
             Html.h1 [] [ Html.text "SigningOut" ]
 
-        SignedOut ->
+        Session.SignedOut ->
             Html.h1 [] [ Html.text "SignedOut" ]
 
 
@@ -221,7 +143,7 @@ signInButton : Model -> Html.Html Msg
 signInButton model =
     Html.button
         [ Attributes.type_ "button"
-        , Attributes.disabled (not (isSignedOut model))
+        , Attributes.disabled (not (Session.isSignedOut model.session))
         , Events.onClick SignInClicked
         ]
         [ Html.text "Sign in with Google" ]
@@ -231,7 +153,7 @@ signOutButton : Model -> Html.Html Msg
 signOutButton model =
     Html.button
         [ Attributes.type_ "button"
-        , Attributes.disabled (not (isSignedIn model))
+        , Attributes.disabled (not (Session.isSignedIn model.session))
         , Events.onClick SignOutClicked
         ]
         [ Html.text "Sign out" ]
@@ -240,10 +162,10 @@ signOutButton model =
 profilePhoto : Session -> List (Html.Html msg)
 profilePhoto session =
     case session of
-        SignedIn user ->
+        Session.SignedIn user ->
             profilePhotoImg user.photoUrl
 
-        SigningOut user ->
+        Session.SigningOut user ->
             profilePhotoImg user.photoUrl
 
         _ ->
