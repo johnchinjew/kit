@@ -5,10 +5,6 @@ import NoticeState exposing (NoticeState)
 import Test exposing (Test)
 
 
-type Msg
-    = NoticeExpired Int
-
-
 tests : Test
 tests =
     Test.describe "NoticeState"
@@ -23,10 +19,10 @@ tests =
             \_ ->
                 let
                     ( firstState, _ ) =
-                        NoticeState.set NoticeExpired "First" NoticeState.empty
+                        NoticeState.set "First" NoticeState.empty
 
                     ( secondState, _ ) =
-                        NoticeState.set NoticeExpired "Second" firstState
+                        NoticeState.set "Second" firstState
                 in
                 Expect.equal
                     { current =
@@ -41,21 +37,27 @@ tests =
             \_ ->
                 let
                     ( state, _ ) =
-                        NoticeState.set NoticeExpired "First" NoticeState.empty
+                        NoticeState.set "First" NoticeState.empty
+
+                    ( expiredState, _ ) =
+                        NoticeState.update (NoticeState.Expired 0) state
                 in
                 Expect.equal
                     { current = Nothing
                     , nextId = 1
                     }
-                    (NoticeState.expire 0 state)
+                    expiredState
         , Test.test "ignores expiration for a replaced notice" <|
             \_ ->
                 let
                     ( firstState, _ ) =
-                        NoticeState.set NoticeExpired "First" NoticeState.empty
+                        NoticeState.set "First" NoticeState.empty
 
                     ( secondState, _ ) =
-                        NoticeState.set NoticeExpired "Second" firstState
+                        NoticeState.set "Second" firstState
+
+                    ( afterOldExpiration, _ ) =
+                        NoticeState.update (NoticeState.Expired 0) secondState
                 in
-                Expect.equal secondState (NoticeState.expire 0 secondState)
+                Expect.equal secondState afterOldExpiration
         ]

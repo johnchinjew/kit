@@ -71,7 +71,7 @@ type Msg
     | SignOutClicked
     | SignOutFailed String
     | AuthChanged (Maybe User)
-    | NoticeExpired Int
+    | NoticeStateMsg NoticeState.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -88,11 +88,10 @@ update msg model =
         SignInFailed code ->
             case model.session of
                 CheckingAuth ->
-                    ( model, Cmd.none )
-                        |> showNotice (signInErrorMessage code)
+                    model |> showNotice (signInErrorMessage code)
 
                 SigningIn ->
-                    ( { model | session = SignedOut }, Cmd.none )
+                    { model | session = SignedOut }
                         |> showNotice (signInErrorMessage code)
 
                 _ ->
@@ -109,7 +108,7 @@ update msg model =
         SignOutFailed code ->
             case model.session of
                 SigningOut user ->
-                    ( { model | session = SignedIn user }, Cmd.none )
+                    { model | session = SignedIn user }
                         |> showNotice (signOutErrorMessage code)
 
                 _ ->
@@ -118,8 +117,9 @@ update msg model =
         AuthChanged user ->
             ( { model | session = sessionFromUser user }, Cmd.none )
 
-        NoticeExpired noticeId ->
-            ( { model | noticeState = NoticeState.expire noticeId model.noticeState }, Cmd.none )
+        NoticeStateMsg noticeMsg ->
+            NoticeState.update noticeMsg model.noticeState
+                |> handleNoticeStateOutcome model
 
 
 sessionFromUser : Maybe User -> Session
@@ -155,14 +155,16 @@ signOutErrorMessage code =
             "Could not sign out. Please try again."
 
 
-showNotice : String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-showNotice message ( model, cmd ) =
-    let
-        ( noticeState, noticeCmd ) =
-            NoticeState.set NoticeExpired message model.noticeState
-    in
+showNotice : String -> Model -> ( Model, Cmd Msg )
+showNotice message model =
+    NoticeState.set message model.noticeState
+        |> handleNoticeStateOutcome model
+
+
+handleNoticeStateOutcome : Model -> ( NoticeState, Cmd NoticeState.Msg ) -> ( Model, Cmd Msg )
+handleNoticeStateOutcome model ( noticeState, noticeCmd ) =
     ( { model | noticeState = noticeState }
-    , Cmd.batch [ cmd, noticeCmd ]
+    , Cmd.map NoticeStateMsg noticeCmd
     )
 
 

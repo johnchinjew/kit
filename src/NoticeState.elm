@@ -1,9 +1,10 @@
 module NoticeState exposing
-    ( Notice
+    ( Msg(..)
+    , Notice
     , NoticeState
     , empty
-    , expire
     , set
+    , update
     )
 
 import Process
@@ -22,13 +23,17 @@ type alias Notice =
     }
 
 
+type Msg
+    = Expired Int
+
+
 empty : NoticeState
 empty =
     { current = Nothing, nextId = 0 }
 
 
-set : (Int -> msg) -> String -> NoticeState -> ( NoticeState, Cmd msg )
-set onExpiration message state =
+set : String -> NoticeState -> ( NoticeState, Cmd Msg )
+set message state =
     let
         notice =
             { id = state.nextId
@@ -36,8 +41,15 @@ set onExpiration message state =
             }
     in
     ( { state | current = Just notice, nextId = state.nextId + 1 }
-    , Task.perform (\_ -> onExpiration notice.id) (Process.sleep (toFloat 6000))
+    , Task.perform (\_ -> Expired notice.id) (Process.sleep (toFloat 6000))
     )
+
+
+update : Msg -> NoticeState -> ( NoticeState, Cmd Msg )
+update msg state =
+    case msg of
+        Expired noticeId ->
+            ( expire noticeId state, Cmd.none )
 
 
 expire : Int -> NoticeState -> NoticeState
