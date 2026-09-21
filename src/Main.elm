@@ -1,25 +1,12 @@
-port module Main exposing (main)
+module Main exposing (main)
 
 import Browser exposing (Document)
 import Html
 import Html.Attributes as Attributes
 import Html.Events as Events
 import NoticeState exposing (Notice, NoticeState)
-
-
-port signIn : () -> Cmd msg
-
-
-port signInFailed : (String -> msg) -> Sub msg
-
-
-port signOut : () -> Cmd msg
-
-
-port signOutFailed : (String -> msg) -> Sub msg
-
-
-port authChanged : (Maybe User -> msg) -> Sub msg
+import Ports
+import User exposing (User)
 
 
 main : Program () Model Msg
@@ -48,10 +35,6 @@ type Session
     | SignedIn User
     | SigningOut User
     | SignedOut
-
-
-type alias User =
-    { photoUrl : Maybe String }
 
 
 isSignedOut : Model -> Bool
@@ -97,7 +80,7 @@ update msg model =
         SignInClicked ->
             case model.session of
                 SignedOut ->
-                    ( { model | session = SigningIn }, signIn () )
+                    ( { model | session = SigningIn }, Ports.signIn () )
 
                 _ ->
                     ( model, Cmd.none )
@@ -118,7 +101,7 @@ update msg model =
         SignOutClicked ->
             case model.session of
                 SignedIn user ->
-                    ( { model | session = SigningOut user }, signOut () )
+                    ( { model | session = SigningOut user }, Ports.signOut () )
 
                 _ ->
                     ( model, Cmd.none )
@@ -190,9 +173,9 @@ showNotice message ( model, cmd ) =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
-        [ authChanged AuthChanged
-        , signInFailed SignInFailed
-        , signOutFailed SignOutFailed
+        [ Ports.authChanged AuthChanged
+        , Ports.signInFailed SignInFailed
+        , Ports.signOutFailed SignOutFailed
         ]
 
 
