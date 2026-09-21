@@ -1,11 +1,12 @@
 module Main exposing (main)
 
 import Browser exposing (Document)
-import Html
+import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events
 import NoticeState exposing (Notice, NoticeState)
 import Session exposing (Session)
+import User exposing (User)
 
 
 main : Program () Model Msg
@@ -61,8 +62,7 @@ update msg model =
             Session.update sessionMsg model.session |> handleSessionOutcome model
 
         NoticeStateMsg noticeMsg ->
-            NoticeState.update noticeMsg model.noticeState
-                |> handleNoticeStateOutcome model
+            NoticeState.update noticeMsg model.noticeState |> handleNoticeStateOutcome model
 
 
 handleSessionOutcome : Model -> ( Session, Maybe Session.Notice, Cmd Session.Msg ) -> ( Model, Cmd Msg )
@@ -109,38 +109,30 @@ subscriptions _ =
 
 view : Model -> Document Msg
 view model =
-    { title = "Kit"
-    , body =
-        [ sessionSummary model.session
-        , signInButton model
-        , signOutButton model
-        ]
-            ++ profilePhoto model.session
-            ++ notice model.noticeState.current
-    }
+    { title = "Kit", body = viewBody model }
 
 
-sessionSummary : Session -> Html.Html Msg
-sessionSummary session =
-    case session of
+viewBody : Model -> List (Html Msg)
+viewBody model =
+    case model.session of
         Session.CheckingAuth ->
-            Html.h1 [] [ Html.text "CheckingAuth" ]
+            Html.text "Loading" :: viewNotice model.noticeState.current
 
         Session.SigningIn ->
-            Html.h1 [] [ Html.text "SigningIn" ]
+            Html.text "Signing in" :: viewNotice model.noticeState.current
 
-        Session.SignedIn _ ->
-            Html.h1 [] [ Html.text "SignedIn" ]
+        Session.SignedIn user ->
+            [ viewSignOutButton model, viewProfilePhoto user ] ++ viewNotice model.noticeState.current
 
-        Session.SigningOut _ ->
-            Html.h1 [] [ Html.text "SigningOut" ]
+        Session.SigningOut user ->
+            [ Html.text "Signing out", viewProfilePhoto user ] ++ viewNotice model.noticeState.current
 
         Session.SignedOut ->
-            Html.h1 [] [ Html.text "SignedOut" ]
+            viewSignInButton model :: viewNotice model.noticeState.current
 
 
-signInButton : Model -> Html.Html Msg
-signInButton model =
+viewSignInButton : Model -> Html Msg
+viewSignInButton model =
     Html.button
         [ Attributes.type_ "button"
         , Attributes.disabled (not (Session.isSignedOut model.session))
@@ -149,8 +141,8 @@ signInButton model =
         [ Html.text "Sign in with Google" ]
 
 
-signOutButton : Model -> Html.Html Msg
-signOutButton model =
+viewSignOutButton : Model -> Html Msg
+viewSignOutButton model =
     Html.button
         [ Attributes.type_ "button"
         , Attributes.disabled (not (Session.isSignedIn model.session))
@@ -159,34 +151,20 @@ signOutButton model =
         [ Html.text "Sign out" ]
 
 
-profilePhoto : Session -> List (Html.Html msg)
-profilePhoto session =
-    case session of
-        Session.SignedIn user ->
-            profilePhotoImg user.photoUrl
-
-        Session.SigningOut user ->
-            profilePhotoImg user.photoUrl
-
-        _ ->
-            []
-
-
-profilePhotoImg : Maybe String -> List (Html.Html msg)
-profilePhotoImg maybePhotoUrl =
-    [ Html.img
-        [ Attributes.src (Maybe.withDefault "/assets/profile-placeholder.svg" maybePhotoUrl)
+viewProfilePhoto : User -> Html msg
+viewProfilePhoto user =
+    Html.img
+        [ Attributes.src (Maybe.withDefault "/assets/profile-placeholder.svg" user.photoUrl)
         , Attributes.alt "Profile photo"
         ]
         []
-    ]
 
 
-notice : Maybe Notice -> List (Html.Html msg)
-notice maybeNotice =
+viewNotice : Maybe Notice -> List (Html msg)
+viewNotice maybeNotice =
     case maybeNotice of
-        Just currentNotice ->
-            [ Html.p [] [ Html.text currentNotice.message ] ]
+        Just notice ->
+            [ Html.p [] [ Html.text notice.message ] ]
 
         Nothing ->
             []
