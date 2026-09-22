@@ -9,8 +9,15 @@ import {
   signInWithRedirect,
   signOut,
 } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  doc,
+  getFirestore,
+  onSnapshot,
+  setDoc,
+} from "firebase/firestore";
 import { registerSW } from "virtual:pwa-register";
+import { createTaskWrite, decodeUserData } from "./userData.js";
 
 import "./styles.css";
 
@@ -51,12 +58,35 @@ try {
   app.ports.signInFailed.send(error.code || "auth/unknown");
 }
 
+let unsubscribeUserData = null;
+
 onAuthStateChanged(getAuth(), (user) => {
-  if (user) {
-    app.ports.authChanged.send({ photoUrl: user.photoURL });
-  } else {
-    app.ports.authChanged.send(null);
+  if (unsubscribeUserData) {
+    unsubscribeUserData();
+    unsubscribeUserData = null;
   }
+
+  if (!user) {
+    app.ports.authChanged.send(null);
+    return;
+  }
+
+  app.ports.authChanged.send({ photoUrl: user.photoURL });
+
+  unsubscribeUserData = onSnapshot(
+    doc(getFirestore(), "users", user.uid),
+    (snapshot) => {
+      try {
+        const userData = decodeUserData(snapshot);
+        app.ports.userDataChanged.send(userData);
+      } catch {
+        app.ports.userDataFailed.send("decode-failed");
+      }
+    },
+    (error) => {
+      app.ports.userDataFailed.send(error.code || "unknown");
+    },
+  );
 });
 
 app.ports.signIn.subscribe(async () => {
@@ -74,5 +104,25 @@ app.ports.signOut.subscribe(async () => {
     await signOut(getAuth());
   } catch (error) {
     app.ports.signOutFailed.send(error.code || "auth/unknown");
+  }
+});
+
+app.ports.createTask.subscribe(async (title) => {
+  const userId = getAuth().currentUser?.uid;
+
+  if (!userId) {
+    app.ports.createTaskOutcome.send("auth/not-signed-in");
+    return;
+  }
+
+  try {
+    await setDoc(
+      doc(getFirestore(), "users", userId),
+      createTaskWrite(title),
+      { merge: true },
+    );
+    app.ports.createTaskOutcome.send(null);
+  } catch (error) {
+    app.ports.createTaskOutcome.send(error.code || "unknown");
   }
 });

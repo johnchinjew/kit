@@ -2,6 +2,7 @@ module Session exposing
     ( Msg(..)
     , Notice
     , Session(..)
+    , createTask
     , init
     , isSignedIn
     , isSignedOut
@@ -13,13 +14,14 @@ module Session exposing
 
 import Ports
 import User exposing (User)
+import UserData exposing (UserData)
 
 
 type Session
     = CheckingAuth
     | SigningIn
-    | SignedIn User
-    | SigningOut User
+    | SignedIn User UserData
+    | SigningOut User UserData
     | SignedOut
 
 
@@ -31,6 +33,9 @@ type Msg
     = SignInFailed String
     | SignOutFailed String
     | AuthChanged (Maybe User)
+    | UserDataChanged UserData
+    | UserDataFailed String
+    | CreateTaskOutcome (Maybe String)
 
 
 init : Session
@@ -41,7 +46,7 @@ init =
 isSignedIn : Session -> Bool
 isSignedIn session =
     case session of
-        SignedIn _ ->
+        SignedIn _ _ ->
             True
 
         _ ->
@@ -66,8 +71,25 @@ signIn session =
 signOut : Session -> ( Session, Maybe Notice, Cmd Msg )
 signOut session =
     case session of
-        SignedIn user ->
-            ( SigningOut user, Nothing, Ports.signOut () )
+        SignedIn user userData ->
+            ( SigningOut user userData, Nothing, Ports.signOut () )
+
+        _ ->
+            ( session, Nothing, Cmd.none )
+
+
+createTask : String -> Session -> ( Session, Maybe Notice, Cmd Msg )
+createTask title session =
+    case session of
+        SignedIn _ _ ->
+            if String.isEmpty (String.trim title) then
+                ( session, Nothing, Cmd.none )
+
+            else
+                ( session
+                , Nothing
+                , Ports.createTask (String.trim title)
+                )
 
         _ ->
             ( session, Nothing, Cmd.none )
@@ -93,8 +115,30 @@ update msg session =
 
         SignOutFailed code ->
             case session of
-                SigningOut user ->
-                    ( SignedIn user, Just (signOutNotice code), Cmd.none )
+                SigningOut user userData ->
+                    ( SignedIn user userData, Just (signOutNotice code), Cmd.none )
+
+                _ ->
+                    ( session, Nothing, Cmd.none )
+
+        UserDataChanged userData ->
+            ( updateUserData userData session, Nothing, Cmd.none )
+
+        CreateTaskOutcome maybeErrorCode ->
+            case maybeErrorCode of
+                Just _ ->
+                    ( session, Just { message = "Could not add task. Please try again." }, Cmd.none )
+
+                Nothing ->
+                    ( session, Nothing, Cmd.none )
+
+        UserDataFailed _ ->
+            case session of
+                SignedIn _ _ ->
+                    ( session, Just { message = "Could not load your tasks. Please try again." }, Cmd.none )
+
+                SigningOut _ _ ->
+                    ( session, Just { message = "Could not load your tasks. Please try again." }, Cmd.none )
 
                 _ ->
                     ( session, Nothing, Cmd.none )
@@ -103,11 +147,24 @@ update msg session =
             ( fromUser maybeUser, Nothing, Cmd.none )
 
 
+updateUserData : UserData -> Session -> Session
+updateUserData userData session =
+    case session of
+        SignedIn user _ ->
+            SignedIn user userData
+
+        SigningOut user _ ->
+            SigningOut user userData
+
+        _ ->
+            session
+
+
 fromUser : Maybe User -> Session
 fromUser maybeUser =
     case maybeUser of
         Just user ->
-            SignedIn user
+            SignedIn user UserData.empty
 
         Nothing ->
             SignedOut
@@ -142,4 +199,7 @@ subscriptions =
         [ Ports.authChanged AuthChanged
         , Ports.signInFailed SignInFailed
         , Ports.signOutFailed SignOutFailed
+        , Ports.userDataChanged UserDataChanged
+        , Ports.userDataFailed UserDataFailed
+        , Ports.createTaskOutcome CreateTaskOutcome
         ]
