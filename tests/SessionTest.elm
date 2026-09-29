@@ -1,8 +1,10 @@
 module SessionTest exposing (tests)
 
 import Expect
+import Json.Encode as Encode
 import Session exposing (Msg(..), Session(..))
 import Test exposing (Test)
+import UserData
 
 
 tests : Test
@@ -52,7 +54,7 @@ tests =
             \_ ->
                 let
                     signedIn =
-                        SignedIn { photoUrl = Nothing }
+                        SignedIn { photoUrl = Nothing } UserData.empty
 
                     ( session, authFailure, _ ) =
                         Session.update (SignInFailed "auth/network-request-failed") signedIn
@@ -65,10 +67,10 @@ tests =
                         { photoUrl = Just "photo.png" }
 
                     ( session, authFailure, _ ) =
-                        Session.update (SignOutFailed "auth/network-request-failed") (SigningOut user)
+                        Session.update (SignOutFailed "auth/network-request-failed") (SigningOut user UserData.empty)
                 in
                 Expect.equal
-                    ( SignedIn user
+                    ( SignedIn user UserData.empty
                     , Just { message = "Could not sign out. Check your connection and try again." }
                     )
                     ( session, authFailure )
@@ -76,7 +78,7 @@ tests =
             \_ ->
                 let
                     signedIn =
-                        SignedIn { photoUrl = Just "photo.png" }
+                        SignedIn { photoUrl = Just "photo.png" } UserData.empty
 
                     ( session, maybeNotice, _ ) =
                         Session.update (SignOutFailed "auth/network-request-failed") signedIn
@@ -89,10 +91,10 @@ tests =
                         { photoUrl = Nothing }
 
                     ( session, maybeNotice, _ ) =
-                        Session.update (SignOutFailed "auth/unknown") (SigningOut user)
+                        Session.update (SignOutFailed "auth/unknown") (SigningOut user UserData.empty)
                 in
                 Expect.equal
-                    ( SignedIn user, Just { message = "Could not sign out. Please try again." } )
+                    ( SignedIn user UserData.empty, Just { message = "Could not sign out. Please try again." } )
                     ( session, maybeNotice )
         , Test.test "authentication changes replace the session state" <|
             \_ ->
@@ -104,10 +106,10 @@ tests =
                         Session.update (AuthChanged (Just user)) SignedOut
 
                     ( signedOut, signOutNotice, _ ) =
-                        Session.update (AuthChanged Nothing) (SigningOut user)
+                        Session.update (AuthChanged Nothing) (SigningOut user UserData.empty)
                 in
                 Expect.equal
-                    ( ( SignedIn user, Nothing ), ( SignedOut, Nothing ) )
+                    ( ( SignedIn user UserData.empty, Nothing ), ( SignedOut, Nothing ) )
                     ( ( signedIn, signInNotice ), ( signedOut, signOutNotice ) )
         , Test.test "sign-in and sign-out start from their allowed states" <|
             \_ ->
@@ -119,10 +121,10 @@ tests =
                         Session.signIn SignedOut
 
                     ( signOutState, signOutNotice, _ ) =
-                        Session.signOut (SignedIn user)
+                        Session.signOut (SignedIn user UserData.empty)
                 in
                 Expect.equal
-                    ( ( SigningIn, Nothing ), ( SigningOut user, Nothing ) )
+                    ( ( SigningIn, Nothing ), ( SigningOut user UserData.empty, Nothing ) )
                     ( ( signInState, signInNotice ), ( signOutState, signOutNotice ) )
         , Test.test "sign-in and sign-out are ignored in disallowed states" <|
             \_ ->
@@ -134,9 +136,63 @@ tests =
                         Session.signIn CheckingAuth
 
                     ( signOutState, signOutNotice, _ ) =
-                        Session.signOut (SigningOut user)
+                        Session.signOut (SigningOut user UserData.empty)
                 in
                 Expect.equal
-                    ( ( CheckingAuth, Nothing ), ( SigningOut user, Nothing ) )
+                    ( ( CheckingAuth, Nothing ), ( SigningOut user UserData.empty, Nothing ) )
                     ( ( signInState, signInNotice ), ( signOutState, signOutNotice ) )
+        , Test.test "applies task snapshots while signed in" <|
+            \_ ->
+                let
+                    user =
+                        { photoUrl = Nothing }
+
+                    task =
+                        { id = "task-1", title = "Buy milk" }
+
+                    ( session, _, _ ) =
+                        Session.update
+                            (UserDataChanged (Just (UserData.encode { tasks = [ task ] })))
+                            (SignedIn user UserData.empty)
+                in
+                Expect.equal (SignedIn user { tasks = [ task ] }) session
+        , Test.test "ignores task snapshots while signed out" <|
+            \_ ->
+                let
+                    ( session, _, _ ) =
+                        Session.update
+                            (UserDataChanged (Just (UserData.encode { tasks = [ { id = "task-1", title = "Buy milk" } ] })))
+                            SignedOut
+                in
+                Expect.equal SignedOut session
+        , Test.test "a missing document clears previously loaded data" <|
+            \_ ->
+                let
+                    user =
+                        { photoUrl = Nothing }
+
+                    ( session, maybeNotice, _ ) =
+                        Session.update (UserDataChanged Nothing)
+                            (SignedIn user { tasks = [ { id = "task-1", title = "Buy milk" } ] })
+                in
+                Expect.equal ( SignedIn user UserData.empty, Nothing ) ( session, maybeNotice )
+        , Test.test "a decode failure preserves loaded data and shows the load failure notice" <|
+            \_ ->
+                let
+                    signedIn =
+                        SignedIn { photoUrl = Nothing } { tasks = [ { id = "task-1", title = "Buy milk" } ] }
+
+                    ( session, maybeNotice, _ ) =
+                        Session.update (UserDataChanged (Just (Encode.object []))) signedIn
+                in
+                Expect.equal
+                    ( signedIn, Just { message = "Could not load your tasks. Please try again." } )
+                    ( session, maybeNotice )
+        , Test.test "malformed snapshots do not show notices while signed out" <|
+            \_ ->
+                let
+                    ( session, maybeNotice, _ ) =
+                        Session.update (UserDataChanged (Just Encode.null)) SignedOut
+                in
+                Expect.equal ( SignedOut, Nothing ) ( session, maybeNotice )
         ]

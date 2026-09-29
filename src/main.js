@@ -9,8 +9,14 @@ import {
   signInWithRedirect,
   signOut,
 } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  doc,
+  getFirestore,
+  onSnapshot,
+} from "firebase/firestore";
 import { registerSW } from "virtual:pwa-register";
+import { setDoc } from "./firestore.js";
 
 import "./styles.css";
 
@@ -51,12 +57,30 @@ try {
   app.ports.signInFailed.send(error.code || "auth/unknown");
 }
 
+let unsubscribeUserData = null;
+
 onAuthStateChanged(getAuth(), (user) => {
-  if (user) {
-    app.ports.authChanged.send({ photoUrl: user.photoURL });
-  } else {
-    app.ports.authChanged.send(null);
+  if (unsubscribeUserData) {
+    unsubscribeUserData();
+    unsubscribeUserData = null;
   }
+
+  if (!user) {
+    app.ports.authChanged.send(null);
+    return;
+  }
+
+  app.ports.authChanged.send({ photoUrl: user.photoURL });
+
+  unsubscribeUserData = onSnapshot(
+    doc(getFirestore(), "users", user.uid),
+    (snapshot) => {
+      app.ports.userDataChanged.send(snapshot.exists() ? snapshot.data() : null);
+    },
+    (error) => {
+      app.ports.userDataFailed.send(error.code || "unknown");
+    },
+  );
 });
 
 app.ports.signIn.subscribe(async () => {
@@ -74,5 +98,37 @@ app.ports.signOut.subscribe(async () => {
     await signOut(getAuth());
   } catch (error) {
     app.ports.signOutFailed.send(error.code || "auth/unknown");
+  }
+});
+
+app.ports.generateUuid.subscribe(() => {
+  let uuid;
+  try {
+    uuid = crypto.randomUUID();
+  } catch {
+    app.ports.uuidFailed.send("unknown");
+    return;
+  }
+
+  app.ports.uuidGenerated.send(uuid);
+});
+
+app.ports.setDoc.subscribe(async (write) => {
+  const userId = getAuth().currentUser?.uid;
+
+  if (!userId) {
+    app.ports.setDocFailed.send("auth/not-signed-in");
+    return;
+  }
+
+  try {
+    await setDoc(
+      doc(getFirestore(), "users", userId),
+      write,
+    );
+  } catch (error) {
+    if (getAuth().currentUser?.uid === userId) {
+      app.ports.setDocFailed.send(error.code || "unknown");
+    }
   }
 });

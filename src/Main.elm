@@ -6,7 +6,10 @@ import Html.Attributes as Attributes
 import Html.Events as Events
 import NoticeState exposing (Notice, NoticeState)
 import Session exposing (Session)
+import TaskCreation
+import Task_ exposing (Task)
 import User exposing (User)
+import UserData exposing (UserData)
 
 
 main : Program () Model Msg
@@ -26,6 +29,7 @@ main =
 type alias Model =
     { session : Session
     , noticeState : NoticeState
+    , taskCreation : TaskCreation.State
     }
 
 
@@ -33,6 +37,7 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { session = Session.init
       , noticeState = NoticeState.empty
+      , taskCreation = TaskCreation.empty
       }
     , Cmd.none
     )
@@ -45,6 +50,9 @@ init _ =
 type Msg
     = SignInClicked
     | SignOutClicked
+    | CreateTaskClicked
+    | TaskTitleChanged String
+    | TaskCreationMsg TaskCreation.Msg
     | SessionMsg Session.Msg
     | NoticeStateMsg NoticeState.Msg
 
@@ -56,13 +64,60 @@ update msg model =
             Session.signIn model.session |> handleSessionOutcome model
 
         SignOutClicked ->
-            Session.signOut model.session |> handleSessionOutcome model
+            Session.signOut model.session
+                |> handleSessionOutcome { model | taskCreation = TaskCreation.reset model.taskCreation }
+
+        CreateTaskClicked ->
+            if not (Session.isSignedIn model.session) then
+                ( model, Cmd.none )
+
+            else
+                TaskCreation.update TaskCreation.Submit model.taskCreation
+                    |> handleTaskCreationOutcome model
+
+        TaskTitleChanged title ->
+            ( { model | taskCreation = TaskCreation.setTitle title model.taskCreation }, Cmd.none )
+
+        TaskCreationMsg taskMsg ->
+            TaskCreation.update taskMsg model.taskCreation
+                |> handleTaskCreationOutcome model
 
         SessionMsg sessionMsg ->
-            Session.update sessionMsg model.session |> handleSessionOutcome model
+            let
+                modelForSessionMsg =
+                    case sessionMsg of
+                        Session.AuthChanged _ ->
+                            { model | taskCreation = TaskCreation.reset model.taskCreation }
+
+                        _ ->
+                            model
+            in
+            Session.update sessionMsg model.session |> handleSessionOutcome modelForSessionMsg
 
         NoticeStateMsg noticeMsg ->
             NoticeState.update noticeMsg model.noticeState |> handleNoticeStateOutcome model
+
+
+handleTaskCreationOutcome : Model -> ( TaskCreation.State, Maybe String, Cmd TaskCreation.Msg ) -> ( Model, Cmd Msg )
+handleTaskCreationOutcome model ( taskCreation, maybeNotice, taskCreationCmd ) =
+    let
+        updatedModel =
+            { model | taskCreation = taskCreation }
+
+        cmdFromTaskCreation =
+            Cmd.map TaskCreationMsg taskCreationCmd
+    in
+    case maybeNotice of
+        Nothing ->
+            ( updatedModel, cmdFromTaskCreation )
+
+        Just notice ->
+            let
+                ( modelWithNotice, cmdFromNotice ) =
+                    NoticeState.set notice model.noticeState
+                        |> handleNoticeStateOutcome updatedModel
+            in
+            ( modelWithNotice, Cmd.batch [ cmdFromTaskCreation, cmdFromNotice ] )
 
 
 handleSessionOutcome : Model -> ( Session, Maybe Session.Notice, Cmd Session.Msg ) -> ( Model, Cmd Msg )
@@ -100,7 +155,10 @@ handleNoticeStateOutcome model ( noticeState, noticeCmd ) =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.map SessionMsg Session.subscriptions
+    Sub.batch
+        [ Sub.map SessionMsg Session.subscriptions
+        , Sub.map TaskCreationMsg TaskCreation.subscriptions
+        ]
 
 
 
@@ -121,11 +179,20 @@ viewBody model =
         Session.SigningIn ->
             Html.text "Signing in" :: viewNotice model.noticeState.current
 
-        Session.SignedIn user ->
-            [ viewSignOutButton model, viewProfilePhoto user ] ++ viewNotice model.noticeState.current
+        Session.SignedIn user userData ->
+            [ viewSignOutButton model
+            , viewProfilePhoto user
+            , viewNewTaskForm model
+            , viewTaskList userData
+            ]
+                ++ viewNotice model.noticeState.current
 
-        Session.SigningOut user ->
-            [ Html.text "Signing out", viewProfilePhoto user ] ++ viewNotice model.noticeState.current
+        Session.SigningOut user userData ->
+            [ Html.text "Signing out"
+            , viewProfilePhoto user
+            , viewTaskList userData
+            ]
+                ++ viewNotice model.noticeState.current
 
         Session.SignedOut ->
             viewSignInButton model :: viewNotice model.noticeState.current
@@ -158,6 +225,38 @@ viewProfilePhoto user =
         , Attributes.alt "Profile photo"
         ]
         []
+
+
+viewNewTaskForm : Model -> Html Msg
+viewNewTaskForm model =
+    Html.div []
+        [ Html.input
+            [ Attributes.type_ "text"
+            , Attributes.value (TaskCreation.title model.taskCreation)
+            , Attributes.placeholder "Task title"
+            , Events.onInput TaskTitleChanged
+            ]
+            []
+        , Html.button
+            [ Attributes.type_ "button"
+            , Attributes.disabled
+                (String.isEmpty (String.trim (TaskCreation.title model.taskCreation))
+                    || TaskCreation.isPending model.taskCreation
+                )
+            , Events.onClick CreateTaskClicked
+            ]
+            [ Html.text "Add task" ]
+        ]
+
+
+viewTaskList : UserData -> Html msg
+viewTaskList userData =
+    Html.ul [] (List.map viewTask userData.tasks)
+
+
+viewTask : Task -> Html msg
+viewTask task =
+    Html.li [] [ Html.text task.title ]
 
 
 viewNotice : Maybe Notice -> List (Html msg)
