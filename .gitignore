@@ -3,5 +3,4 @@
 gha-creds-*.json
 .firebase/
 node_modules/
-elm-stuff/
 dist/

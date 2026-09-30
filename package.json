@@ -6,34 +6,26 @@
   },
   "scripts": {
     "build": "vite build",
-    "check": "npm run format:check && npm test",
+    "check": "tsc --noEmit && npm test",
     "dev": "concurrently --kill-others \"npm run dev:build\" \"npm run dev:emulators\"",
     "dev:build": "vite build --watch --mode emulator",
     "dev:emulators": "firebase emulators:start",
-    "format": "elm-format src tests --yes",
-    "format:check": "elm-format src tests --validate",
-    "test": "npm run test:elm && npm run test:firebase",
-    "test:elm": "elm-test",
-    "test:firebase": "firebase emulators:exec --config firebase.test.json --project demo-kit-tasks \"node --test \\\"tests/**/*.firebase.test.js\\\"\""
+    "test": "firebase emulators:exec --config firebase.test.json --project demo-kit-tasks \"vitest run\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "concurrently": "^10.0.5",
-    "elm": "^0.19.2-0",
-    "elm-format": "^0.8.8",
-    "elm-test": "^0.19.2-1",
-    "firebase-tools": "^15.30.2",
+    "firebase-tools": "^15.32.0",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.3.0",
-    "vite-plugin-elm": "^3.0.1",
-    "vite-plugin-pwa": "^1.3.0"
-  },
-  "allowScripts": {
-    "elm@0.19.2-0": true,
-    "elm-format@0.8.8": true
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vite-plugin-pwa": "^1.3.0",
+    "vite-plugin-solid": "^2.11.14",
+    "vitest": "^5.0.2"
   },
   "dependencies": {
-    "firebase": "^12.19.0"
+    "firebase": "^12.19.0",
+    "solid-js": "^1.9.15"
   }
 }

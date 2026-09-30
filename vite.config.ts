@@ -1,11 +1,11 @@
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
-import elmPlugin from "vite-plugin-elm";
+import solidPlugin from "vite-plugin-solid";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
-    elmPlugin(),
+    solidPlugin(),
     tailwindcss(),
     VitePWA({
       registerType: "prompt",

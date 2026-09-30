@@ -19,7 +19,7 @@ Just a to-do list.
 ## Architecture
 
 ```
-Elm/JS -> Cloudflare -> Firebase Hosting
+Client -> Cloudflare -> Firebase Hosting
    |
    +----> Firebase Auth
    |
