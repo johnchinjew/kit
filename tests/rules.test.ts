@@ -1,25 +1,26 @@
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import {
   assertFails,
   assertSucceeds,
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
+import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const projectId = "demo-kit-tasks";
 const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
-let testEnvironment;
+let testEnvironment: RulesTestEnvironment;
 
 describe("Firestore security rules", () => {
-  before(async () => {
+  beforeAll(async () => {
     testEnvironment = await initializeTestEnvironment({
       projectId,
       firestore: { rules },
     });
   });
 
-  after(async () => {
+  afterAll(async () => {
     await testEnvironment.cleanup();
   });
 
