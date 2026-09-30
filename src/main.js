@@ -61,7 +61,9 @@ onAuthStateChanged(getAuth(), (user) => {
 
 app.ports.signIn.subscribe(async () => {
   try {
-    await signInWithRedirect(getAuth(), new GoogleAuthProvider());
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithRedirect(getAuth(), provider);
   } catch (error) {
     app.ports.signInFailed.send(error.code || "auth/unknown");
   }
