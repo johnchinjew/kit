@@ -25,7 +25,7 @@ describe("Session", () => {
   const auth = {} as Auth;
   let controller: ReturnType<typeof createSession>;
   let dispose: () => void;
-  let changeAuth: (user: Pick<User, "photoURL"> | null) => void;
+  let changeAuth: (user: Pick<User, "uid" | "photoURL"> | null) => void;
   let resolveRedirect: (result: null) => void;
   let rejectRedirect: (reason: unknown) => void;
   let showNotice: Mock<(message: string) => void>;
@@ -78,22 +78,22 @@ describe("Session", () => {
     it.each(["photo.png", null])(
       "reads the authenticated user's photo URL: %s",
       (photoURL) => {
-        changeAuth({ photoURL });
+        changeAuth({ uid: "alice", photoURL });
 
         expect(controller.session()).toEqual({
           status: "signed-in",
-          user: { photoUrl: photoURL },
+          user: { id: "alice", photoUrl: photoURL },
         });
         expect(showNotice).not.toHaveBeenCalled();
       },
     );
 
     it("follows subsequent account changes and sign-out events", () => {
-      changeAuth({ photoURL: "first.png" });
-      changeAuth({ photoURL: "second.png" });
+      changeAuth({ uid: "alice", photoURL: "first.png" });
+      changeAuth({ uid: "bob", photoURL: "second.png" });
       expect(controller.session()).toEqual({
         status: "signed-in",
-        user: { photoUrl: "second.png" },
+        user: { id: "bob", photoUrl: "second.png" },
       });
 
       changeAuth(null);
@@ -149,23 +149,23 @@ describe("Session", () => {
       expect(controller.session()).toEqual({ status: "checking-auth" });
       expect(showNotice).toHaveBeenCalledExactlyOnceWith(message);
 
-      changeAuth({ photoURL: "photo.png" });
+      changeAuth({ uid: "alice", photoURL: "photo.png" });
       expect(controller.session()).toEqual({
         status: "signed-in",
-        user: { photoUrl: "photo.png" },
+        user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(onAuthStateChanged).toHaveBeenCalledTimes(1);
     });
 
     it("preserves an authenticated session when a redirect error arrives late", async () => {
-      changeAuth({ photoURL: "photo.png" });
+      changeAuth({ uid: "alice", photoURL: "photo.png" });
 
       rejectRedirect({ code: "auth/user-disabled" });
       await Promise.resolve();
 
       expect(controller.session()).toEqual({
         status: "signed-in",
-        user: { photoUrl: "photo.png" },
+        user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(showNotice).toHaveBeenCalledExactlyOnceWith(
         "Account has been disabled.",
@@ -189,10 +189,10 @@ describe("Session", () => {
         prompt: "select_account",
       });
 
-      changeAuth({ photoURL: "photo.png" });
+      changeAuth({ uid: "alice", photoURL: "photo.png" });
       expect(controller.session()).toEqual({
         status: "signed-in",
-        user: { photoUrl: "photo.png" },
+        user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(showNotice).not.toHaveBeenCalled();
     });
@@ -211,13 +211,13 @@ describe("Session", () => {
     });
 
     it("ignores sign-in when already authenticated", async () => {
-      changeAuth({ photoURL: null });
+      changeAuth({ uid: "alice", photoURL: null });
 
       await controller.signIn();
 
       expect(controller.session()).toEqual({
         status: "signed-in",
-        user: { photoUrl: null },
+        user: { id: "alice", photoUrl: null },
       });
       expect(signInWithRedirect).not.toHaveBeenCalled();
       expect(showNotice).not.toHaveBeenCalled();
@@ -277,7 +277,7 @@ describe("Session", () => {
       expect(showNotice).toHaveBeenCalledTimes(1);
     });
 
-    it.each([{ photoURL: null }, null])(
+    it.each([{ uid: "alice", photoURL: null }, null])(
       "ignores a late failure after an auth event: %j",
       async (user) => {
         changeAuth(null);
@@ -296,7 +296,7 @@ describe("Session", () => {
 
         expect(controller.session()).toEqual(
           user
-            ? { status: "signed-in", user: { photoUrl: user.photoURL } }
+            ? { status: "signed-in", user: { id: user.uid, photoUrl: user.photoURL } }
             : { status: "signed-out" },
         );
         expect(showNotice).not.toHaveBeenCalled();
@@ -306,20 +306,20 @@ describe("Session", () => {
 
   describe("sign-out", () => {
     it("keeps the user until an auth event confirms sign-out", async () => {
-      changeAuth({ photoURL: "photo.png" });
+      changeAuth({ uid: "alice", photoURL: "photo.png" });
 
       const pending = controller.signOut();
 
       expect(controller.session()).toEqual({
         status: "signing-out",
-        user: { photoUrl: "photo.png" },
+        user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(signOut).toHaveBeenCalledExactlyOnceWith(auth);
 
       await pending;
       expect(controller.session()).toEqual({
         status: "signing-out",
-        user: { photoUrl: "photo.png" },
+        user: { id: "alice", photoUrl: "photo.png" },
       });
 
       changeAuth(null);
@@ -328,7 +328,7 @@ describe("Session", () => {
     });
 
     it("ignores duplicate sign-out requests and sign-in while sign-out is pending", async () => {
-      changeAuth({ photoURL: null });
+      changeAuth({ uid: "alice", photoURL: null });
       let resolveOperation!: () => void;
       vi.mocked(signOut).mockReturnValueOnce(
         new Promise<void>((resolve) => {
@@ -342,7 +342,7 @@ describe("Session", () => {
 
       expect(controller.session()).toEqual({
         status: "signing-out",
-        user: { photoUrl: null },
+        user: { id: "alice", photoUrl: null },
       });
       expect(signOut).toHaveBeenCalledTimes(1);
       expect(signInWithRedirect).not.toHaveBeenCalled();
@@ -369,8 +369,8 @@ describe("Session", () => {
       ],
       ["auth/unknown", "Could not sign out. Please try again."],
     ])("reports %s and restores the user", async (code, message) => {
-      const user = { photoUrl: "photo.png" };
-      changeAuth({ photoURL: user.photoUrl });
+      const user = { id: "alice", photoUrl: "photo.png" };
+      changeAuth({ uid: "alice", photoURL: user.photoUrl });
       vi.mocked(signOut).mockRejectedValueOnce({ code });
 
       await controller.signOut();
@@ -380,8 +380,8 @@ describe("Session", () => {
     });
 
     it("allows retrying sign-out after a failure", async () => {
-      const user = { photoUrl: "photo.png" };
-      changeAuth({ photoURL: user.photoUrl });
+      const user = { id: "alice", photoUrl: "photo.png" };
+      changeAuth({ uid: "alice", photoURL: user.photoUrl });
       vi.mocked(signOut).mockRejectedValueOnce({
         code: "auth/network-request-failed",
       });
@@ -396,10 +396,10 @@ describe("Session", () => {
       expect(showNotice).toHaveBeenCalledTimes(1);
     });
 
-    it.each([{ photoURL: "other.png" }, null])(
+    it.each([{ uid: "bob", photoURL: "other.png" }, null])(
       "ignores a late failure after an auth event: %j",
       async (user) => {
-        changeAuth({ photoURL: "photo.png" });
+        changeAuth({ uid: "alice", photoURL: "photo.png" });
         let rejectOperation!: (reason: unknown) => void;
         vi.mocked(signOut).mockReturnValueOnce(
           new Promise<void>((_resolve, reject) => {
@@ -409,7 +409,7 @@ describe("Session", () => {
         const pending = controller.signOut();
         expect(controller.session()).toEqual({
           status: "signing-out",
-          user: { photoUrl: "photo.png" },
+          user: { id: "alice", photoUrl: "photo.png" },
         });
 
         changeAuth(user);
@@ -418,7 +418,7 @@ describe("Session", () => {
 
         expect(controller.session()).toEqual(
           user
-            ? { status: "signed-in", user: { photoUrl: user.photoURL } }
+            ? { status: "signed-in", user: { id: user.uid, photoUrl: user.photoURL } }
             : { status: "signed-out" },
         );
         expect(showNotice).not.toHaveBeenCalled();

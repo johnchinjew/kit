@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import {
   assertFails,
@@ -37,6 +37,49 @@ describe("Firestore security rules", () => {
     await assertSucceeds(updateDoc(userDocument, { name: "Alice Smith" }));
   });
 
+  it("creates the user document when saving the first task", async () => {
+    const aliceDb = testEnvironment.authenticatedContext("alice").firestore();
+    const userDocument = doc(aliceDb, "users/alice");
+
+    await setDoc(userDocument, {
+      tasks: { [crypto.randomUUID()]: { title: "Buy milk" } },
+    }, { merge: true });
+
+    const data = (await getDoc(userDocument)).data()!;
+    expect(Object.values(data.tasks)).toEqual([{ title: "Buy milk" }]);
+    expect(Object.keys(data.tasks)[0]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("preserves existing fields and tasks when two clients save tasks", async () => {
+    const firstClient = testEnvironment.authenticatedContext("alice").firestore();
+    const secondClient = testEnvironment.authenticatedContext("alice").firestore();
+    const userDocument = doc(firstClient, "users/alice");
+    await setDoc(userDocument, {
+      name: "Alice",
+      tasks: { existing: { title: "Walk the dog" } },
+    });
+
+    await Promise.all([
+      setDoc(userDocument, {
+        tasks: { [crypto.randomUUID()]: { title: "Buy milk" } },
+      }, { merge: true }),
+      setDoc(doc(secondClient, "users/alice"), {
+        tasks: { [crypto.randomUUID()]: { title: "Call Mum" } },
+      }, { merge: true }),
+    ]);
+
+    const data = (await getDoc(userDocument)).data()!;
+    expect(data.name).toBe("Alice");
+    expect(data.tasks.existing).toEqual({ title: "Walk the dog" });
+    expect(Object.values(data.tasks)).toHaveLength(3);
+    expect(Object.values(data.tasks)).toEqual(expect.arrayContaining([
+      { title: "Buy milk" },
+      { title: "Call Mum" },
+    ]));
+  });
+
   it("denies unauthenticated access", async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), "users/bob"), { name: "Bob" });
@@ -46,6 +89,9 @@ describe("Firestore security rules", () => {
 
     await assertFails(getDoc(doc(unauthenticatedDb, "users/bob")));
     await assertFails(setDoc(doc(unauthenticatedDb, "users/anonymous"), { name: "Anon" }));
+    await assertFails(setDoc(doc(unauthenticatedDb, "users/anonymous"), {
+      tasks: { [crypto.randomUUID()]: { title: "Buy milk" } },
+    }, { merge: true }));
   });
 
   it("denies access to another user's document", async () => {
@@ -57,6 +103,9 @@ describe("Firestore security rules", () => {
 
     await assertFails(getDoc(doc(aliceDb, "users/bob")));
     await assertFails(updateDoc(doc(aliceDb, "users/bob"), { name: "Changed" }));
+    await assertFails(setDoc(doc(aliceDb, "users/bob"), {
+      tasks: { [crypto.randomUUID()]: { title: "Buy milk" } },
+    }, { merge: true }));
   });
 
   it("denies document deletion", async () => {
