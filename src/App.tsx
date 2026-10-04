@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import Editor from "./Editor";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn, type SigningOut } from "./session";
 import { createTask, emptyUserData, subscribeUserData, type UserData } from "./userData";
@@ -41,7 +42,7 @@ function AppSignedIn(props: {
   signOut: () => void;
   showNotice: (message: string) => void;
 }) {
-  const [editing, setEditing] = createSignal(false);
+  const [selectedTaskId, setSelectedTaskId] = createSignal<string>();
   const [userData, setUserData] = createSignal<UserData>(emptyUserData());
 
   createEffect(() => {
@@ -52,60 +53,52 @@ function AppSignedIn(props: {
     onCleanup(unsubscribe);
   });
 
+  function addTask() {
+    const taskId = crypto.randomUUID();
+    void createTask(props.session.user.id, taskId).catch(() => {
+      props.showNotice("Could not create task. Try again later.");
+      if (selectedTaskId() === taskId) setSelectedTaskId(undefined);
+    });
+    setSelectedTaskId(taskId);
+  }
+
   return (
     <Switch>
-      <Match when={!editing()}>
+      <Match when={!selectedTaskId()}>
         <button type="button" onClick={props.signOut}>
           Sign out
         </button>
         <ProfilePhoto photoUrl={props.session.user.photoUrl} />
         <ul>
-          <For each={Object.entries(userData().tasks)}>{([, task]) => <li>{task.title}</li>}</For>
+          <For each={Object.entries(userData().tasks)}>
+            {([taskId, task]) => (
+              <li>
+                <button type="button" onClick={() => setSelectedTaskId(taskId)}>
+                  {task.title}
+                </button>
+              </li>
+            )}
+          </For>
         </ul>
-        <button type="button" onClick={() => setEditing(true)}>
-          Add task
+        <button type="button" onClick={addTask}>
+          Add
         </button>
       </Match>
-      <Match when={editing()}>
-        <Editor
-          session={props.session}
-          showNotice={props.showNotice}
-          onBack={() => setEditing(false)}
-        />
+      <Match when={selectedTaskId()}>
+        {(taskId) => (
+          <Show when={userData().tasks[taskId()]} fallback={<p>Loading task</p>}>
+            {(task) => (
+              <Editor
+                initialDraft={{ id: taskId(), task: task() }}
+                session={props.session}
+                showNotice={props.showNotice}
+                onBack={() => setSelectedTaskId(undefined)}
+              />
+            )}
+          </Show>
+        )}
       </Match>
     </Switch>
-  );
-}
-
-function Editor(props: {
-  session: SignedIn;
-  showNotice: (message: string) => void;
-  onBack: () => void;
-}) {
-  const [title, setTitle] = createSignal("");
-
-  function onClick() {
-    const sanitizedTitle = title().trim();
-    if (sanitizedTitle) {
-      void createTask(props.session.user.id, { title: sanitizedTitle }).catch(() => {
-        props.showNotice("Could not create task. Try again later.");
-      });
-    }
-    props.onBack();
-  }
-
-  return (
-    <main>
-      <button type="button" onClick={onClick}>
-        Back
-      </button>
-      <input
-        name="title"
-        type="text"
-        value={title()}
-        onInput={(event) => setTitle(event.currentTarget.value)}
-      />
-    </main>
   );
 }
 

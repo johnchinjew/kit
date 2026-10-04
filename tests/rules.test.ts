@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, FieldPath, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const projectId = "demo-kit-tasks";
 const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
@@ -92,6 +92,32 @@ describe("Firestore security rules", () => {
     await assertFails(setDoc(doc(unauthenticatedDb, "users/anonymous"), {
       tasks: { [crypto.randomUUID()]: { title: "Buy milk" } },
     }, { merge: true }));
+  });
+
+  it("preserves unknown fields and both edits when clients change different task titles", async () => {
+    const firstClient = testEnvironment.authenticatedContext("alice").firestore();
+    const secondClient = testEnvironment.authenticatedContext("alice").firestore();
+    const userDocument = doc(firstClient, "users/alice");
+    await setDoc(userDocument, {
+      futureField: true,
+      tasks: {
+        "first.with.dots": { title: "Buy milk", details: "Whole milk", futureField: 42 },
+        second: { title: "Walk dog" },
+      },
+    });
+
+    await Promise.all([
+      updateDoc(userDocument, new FieldPath("tasks", "first.with.dots", "title"), "Buy bread"),
+      updateDoc(doc(secondClient, "users/alice"), new FieldPath("tasks", "second", "title"), "Walk dog again"),
+    ]);
+
+    expect((await getDoc(userDocument)).data()).toEqual({
+      futureField: true,
+      tasks: {
+        "first.with.dots": { title: "Buy bread", details: "Whole milk", futureField: 42 },
+        second: { title: "Walk dog again" },
+      },
+    });
   });
 
   it("denies access to another user's document", async () => {

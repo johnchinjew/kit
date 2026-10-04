@@ -8,9 +8,10 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTask, subscribeUserData } from "../src/userData";
+import { createTask, setTaskTitle, subscribeUserData } from "../src/userData";
 
-vi.mock("firebase/firestore", () => ({
+vi.mock("firebase/firestore", async (importOriginal) => ({
+  ...await importOriginal<typeof import("firebase/firestore")>(),
   doc: vi.fn(),
   getFirestore: vi.fn(),
   onSnapshot: vi.fn(),
@@ -28,28 +29,21 @@ describe("User data: task creation", () => {
     vi.mocked(setDoc).mockResolvedValue(undefined);
   });
 
-  it("saves to the specified user's document", async () => {
-    await expect(createTask("alice", { title: "Buy milk" })).resolves.toBeUndefined();
+  it("creates an empty task with the specified ID in the user's document", async () => {
+    await expect(createTask("alice", "first")).resolves.toBeUndefined();
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: expect.any(Object),
+      tasks: { first: { title: "" } },
     }, { merge: true });
-    const { tasks } = vi.mocked(setDoc).mock.calls[0]![1] as {
-      tasks: Record<string, { title: string; }>;
-    };
-    expect(Object.values(tasks)).toEqual([{ title: "Buy milk" }]);
-    expect(Object.keys(tasks)[0]).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
   });
 
   it("propagates asynchronous write failures and allows further writes", async () => {
     const error = new Error("Save failed");
     vi.mocked(setDoc).mockRejectedValueOnce(error);
 
-    await expect(createTask("alice", { title: "Buy milk" })).rejects.toBe(error);
-    await expect(createTask("alice", { title: "Buy milk" })).resolves.toBeUndefined();
+    await expect(createTask("alice", "first")).rejects.toBe(error);
+    await expect(createTask("alice", "second")).resolves.toBeUndefined();
     expect(setDoc).toHaveBeenCalledTimes(2);
   });
 
@@ -57,7 +51,43 @@ describe("User data: task creation", () => {
     const error = new Error("Invalid write");
     vi.mocked(setDoc).mockImplementationOnce(() => { throw error; });
 
-    await expect(createTask("alice", { title: "Buy milk" })).rejects.toBe(error);
+    await expect(createTask("alice", "first")).rejects.toBe(error);
+  });
+});
+
+describe("User data: task title editing", () => {
+  const firestore = {} as Firestore;
+  const userDocument = {} as DocumentReference;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFirestore).mockReturnValue(firestore);
+    vi.mocked(doc).mockReturnValue(userDocument);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+  });
+
+  it("targets only the selected task's title, treating the ID as a literal map key", async () => {
+    await expect(setTaskTitle("alice", "task.with.dots", "Buy bread")).resolves.toBeUndefined();
+
+    expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
+    expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
+      tasks: { "task.with.dots": { title: "Buy bread" } },
+    }, { merge: true });
+  });
+
+  it("propagates write failures and allows further edits", async () => {
+    const error = new Error("Save failed");
+    vi.mocked(setDoc).mockRejectedValueOnce(error);
+
+    await expect(setTaskTitle("alice", "first", "Buy bread")).rejects.toBe(error);
+    await expect(setTaskTitle("alice", "first", "Buy eggs")).resolves.toBeUndefined();
+  });
+
+  it("propagates immediate write failures as promise rejections", async () => {
+    const error = new Error("Invalid write");
+    vi.mocked(setDoc).mockImplementationOnce(() => { throw error; });
+
+    await expect(setTaskTitle("alice", "first", "Buy bread")).rejects.toBe(error);
   });
 });
 

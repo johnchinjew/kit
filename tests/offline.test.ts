@@ -13,7 +13,7 @@ import {
   waitForPendingWrites,
 } from "firebase/firestore";
 import { expect, it, vi } from "vitest";
-import { createTask } from "../src/userData";
+import { createTask, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -23,7 +23,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   return { ...firestore, initializeFirestore: vi.fn(firestore.initializeFirestore) };
 });
 
-it("retains offline task creation across a restart, then syncs", async () => {
+it("retains offline task creation and title editing across a restart, then syncs", async () => {
   const storage = new Map<string, string>();
   vi.stubGlobal("window", {
     location: { hostname: "localhost" },
@@ -51,10 +51,15 @@ it("retains offline task creation across a restart, then syncs", async () => {
   try {
     connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-user" } });
     await disableNetwork(firestore);
-    void createTask("offline-user", { title: "Buy milk" }).catch(() => {});
+    const taskId = crypto.randomUUID();
+    void createTask("offline-user", taskId).catch(() => {});
     const userDocument = doc(firestore, "users", "offline-user");
     const created = await getDocFromCache(userDocument);
-    const taskId = Object.keys(created.data()!.tasks)[0]!;
+    expect(created.data()).toEqual({ tasks: { [taskId]: { title: "" } } });
+    void setTaskTitle("offline-user", taskId, "Buy bread").catch(() => {});
+    expect((await getDocFromCache(userDocument)).data()).toEqual({
+      tasks: { [taskId]: { title: "Buy bread" } },
+    });
 
     await terminate(firestore);
     await deleteApp(app);
@@ -64,7 +69,7 @@ it("retains offline task creation across a restart, then syncs", async () => {
     await disableNetwork(firestore);
     const restoredDocument = doc(firestore, "users", "offline-user");
     const restored = await getDocFromCache(restoredDocument);
-    expect(restored.data()).toEqual({ tasks: { [taskId]: { title: "Buy milk" } } });
+    expect(restored.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread" } } });
     expect(restored.metadata.hasPendingWrites).toBe(true);
 
     await enableNetwork(firestore);

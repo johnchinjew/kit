@@ -1,4 +1,9 @@
-import { doc, getFirestore, onSnapshot, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getFirestore,
+  onSnapshot,
+  setDoc,
+} from "firebase/firestore";
 
 export type UserData = { tasks: Record<string, Task>; };
 
@@ -8,9 +13,15 @@ export function emptyUserData(): UserData {
   return { tasks: {} };
 }
 
-export async function createTask(userId: string, task: Task): Promise<void> {
+export async function createTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [crypto.randomUUID()]: { title: task.title } },
+    tasks: { [taskId]: { title: "" } },
+  }, { merge: true });
+}
+
+export async function setTaskTitle(userId: string, taskId: string, title: string): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    tasks: { [taskId]: { title } },
   }, { merge: true });
 }
 
