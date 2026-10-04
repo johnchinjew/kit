@@ -1,6 +1,12 @@
-import { initializeApp } from "firebase/app";
+import { getApp, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from "firebase/firestore";
 import { registerSW } from "virtual:pwa-register";
 import { render } from "solid-js/web";
 import App from "./App";
@@ -28,6 +34,10 @@ initializeApp({
   storageBucket: "kit-tasks.firebasestorage.app",
   messagingSenderId: "723040117824",
   appId: "1:723040117824:web:6755c08fe69c16641e6ba5",
+});
+
+initializeFirestore(getApp(), {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 
 if (import.meta.env.MODE === "emulator") {
