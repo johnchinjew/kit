@@ -13,6 +13,7 @@ export default function Editor(props: {
   const [draft, setDraft] = createSignal<TaskDraft>(props.initialDraft);
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
+    if (props.initialDraft.task.completed) return;
     setDraft((current) => ({
       ...current,
       task: { ...current.task, title: event.currentTarget.value }
@@ -33,7 +34,6 @@ export default function Editor(props: {
   };
 
   const onClickReopen: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
-    saveTitle();
     void reopenTask(props.session.user.id, draft().id).catch(() => {
       props.showNotice("Could not reopen task. Try again later.");
     });
@@ -41,7 +41,7 @@ export default function Editor(props: {
   };
 
   function saveTitle() {
-    if (draft().task.title !== props.initialDraft.task.title) {
+    if (!props.initialDraft.task.completed && draft().task.title !== props.initialDraft.task.title) {
       void setTaskTitle(props.session.user.id, draft().id, draft().task.title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
@@ -57,6 +57,7 @@ export default function Editor(props: {
         name="title"
         type="text"
         value={draft().task.title}
+        readOnly={props.initialDraft.task.completed}
         onInput={onChangeTitle}
       />
       <Show when={!props.initialDraft.task.completed}>
