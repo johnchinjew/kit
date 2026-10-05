@@ -120,6 +120,34 @@ describe("Firestore security rules", () => {
     });
   });
 
+  it("merges task completion with a concurrent title edit and preserves other fields", async () => {
+    const firstClient = testEnvironment.authenticatedContext("alice").firestore();
+    const secondClient = testEnvironment.authenticatedContext("alice").firestore();
+    const userDocument = doc(firstClient, "users/alice");
+    await setDoc(userDocument, {
+      tasks: {
+        "task.with.dots": { title: "Buy milk", details: "Whole milk" },
+        other: { title: "Walk dog" },
+      },
+    });
+
+    await Promise.all([
+      setDoc(userDocument, {
+        tasks: { "task.with.dots": { completed: true } },
+      }, { merge: true }),
+      setDoc(doc(secondClient, "users/alice"), {
+        tasks: { "task.with.dots": { title: "Buy bread" } },
+      }, { merge: true }),
+    ]);
+
+    expect((await getDoc(userDocument)).data()).toEqual({
+      tasks: {
+        "task.with.dots": { title: "Buy bread", details: "Whole milk", completed: true },
+        other: { title: "Walk dog" },
+      },
+    });
+  });
+
   it("denies access to another user's document", async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), "users/bob"), { name: "Bob" });

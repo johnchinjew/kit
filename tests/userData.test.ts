@@ -8,7 +8,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTask, setTaskTitle, subscribeUserData } from "../src/userData";
+import { completeTask, createTask, setTaskTitle, subscribeUserData } from "../src/userData";
 
 vi.mock("firebase/firestore", async (importOriginal) => ({
   ...await importOriginal<typeof import("firebase/firestore")>(),
@@ -34,7 +34,7 @@ describe("User data: task creation", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { first: { title: "" } },
+      tasks: { first: { title: "", completed: false } },
     }, { merge: true });
   });
 
@@ -91,6 +91,35 @@ describe("User data: task title editing", () => {
   });
 });
 
+describe("User data: task completion", () => {
+  const firestore = {} as Firestore;
+  const userDocument = {} as DocumentReference;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFirestore).mockReturnValue(firestore);
+    vi.mocked(doc).mockReturnValue(userDocument);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+  });
+
+  it("targets only the selected task's completed flag, treating the ID as a literal map key", async () => {
+    await expect(completeTask("alice", "task.with.dots")).resolves.toBeUndefined();
+
+    expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
+    expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
+      tasks: { "task.with.dots": { completed: true } },
+    }, { merge: true });
+  });
+
+  it("propagates write failures and allows another attempt", async () => {
+    const error = new Error("Save failed");
+    vi.mocked(setDoc).mockRejectedValueOnce(error);
+
+    await expect(completeTask("alice", "first")).rejects.toBe(error);
+    await expect(completeTask("alice", "first")).resolves.toBeUndefined();
+  });
+});
+
 describe("User data: subscription", () => {
   const firestore = {} as Firestore;
   const userDocument = {} as DocumentReference;
@@ -123,22 +152,43 @@ describe("User data: subscription", () => {
     receive({
       data: () => ({
         futureField: { enabled: true }, tasks: {
-          first: { title: "Buy milk", details: "Whole milk" },
-          second: { title: "Walk dog" },
+          first: { title: "Buy milk", completed: false, details: "Whole milk" },
+          second: { title: "Walk dog", completed: false },
         }
       })
     } as unknown as DocumentSnapshot);
     expect(onUserData).toHaveBeenLastCalledWith({
       tasks: {
-        first: { title: "Buy milk" },
-        second: { title: "Walk dog" },
+        first: { title: "Buy milk", completed: false },
+        second: { title: "Walk dog", completed: false },
       }
     });
 
     receive({
-      data: () => ({ tasks: { second: { title: "Walk dog again" } } }),
+      data: () => ({ tasks: { second: { title: "Walk dog again", completed: false } } }),
     } as unknown as DocumentSnapshot);
-    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again" } } });
+    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", completed: false } } });
+  });
+
+  it("reads incomplete and completed tasks", () => {
+    const onUserData = vi.fn();
+    const onError = vi.fn();
+    subscribeUserData("alice", onUserData, onError);
+    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      (snapshot: DocumentSnapshot) => void;
+
+    receive({
+      data: () => ({ tasks: {
+        incomplete: { title: "Walk dog", completed: false },
+        completed: { title: "Buy bread", completed: true },
+      } }),
+    } as unknown as DocumentSnapshot);
+
+    expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {
+      incomplete: { title: "Walk dog", completed: false },
+      completed: { title: "Buy bread", completed: true },
+    } });
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it.each([undefined, {}, { tasks: {} }, { futureField: true }])(
@@ -173,7 +223,10 @@ describe("User data: subscription", () => {
     },
   );
 
-  it.each([{}, { title: 42 }, null, Object.assign([], { title: "Invalid array" })])(
+  it.each([{}, { title: 42, completed: false }, { title: "Buy milk" },
+    { title: "Buy milk", completed: "true" },
+    { title: "Buy milk", completed: null }, { title: "Buy milk", completed: undefined },
+    null, Object.assign([], { title: "Invalid array" })])(
     "rejects a malformed task and resumes publishing when data becomes readable: %j",
     (task) => {
       const onUserData = vi.fn();
@@ -181,13 +234,13 @@ describe("User data: subscription", () => {
       subscribeUserData("alice", onUserData, onError);
       const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
         (snapshot: DocumentSnapshot) => void;
-      const valid = { tasks: { valid: { title: "Buy milk" } } };
+      const valid = { tasks: { valid: { title: "Buy milk", completed: false } } };
 
       receive({ data: () => valid } as unknown as DocumentSnapshot);
       receive({
         data: () => ({
           tasks: {
-            valid: { title: "Changed title" },
+            valid: { title: "Changed title", completed: false },
             malformed: task,
           }
         })

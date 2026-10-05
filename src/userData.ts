@@ -7,7 +7,7 @@ import {
 
 export type UserData = { tasks: Record<string, Task>; };
 
-export type Task = { title: string; };
+export type Task = { title: string; completed: boolean; };
 
 export function emptyUserData(): UserData {
   return { tasks: {} };
@@ -15,13 +15,19 @@ export function emptyUserData(): UserData {
 
 export async function createTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { title: "" } },
+    tasks: { [taskId]: { title: "", completed: false } },
   }, { merge: true });
 }
 
 export async function setTaskTitle(userId: string, taskId: string, title: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
     tasks: { [taskId]: { title } },
+  }, { merge: true });
+}
+
+export async function completeTask(userId: string, taskId: string): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    tasks: { [taskId]: { completed: true } },
   }, { merge: true });
 }
 
@@ -49,13 +55,16 @@ function decodeUserData(data: unknown): UserData {
   if (!isRecord(data.tasks)) throw new Error("Invalid tasks map");
 
   return {
-    tasks: Object.fromEntries(Object.entries(data.tasks).map(([id, task]) => {
-      if (!isRecord(task) || typeof task.title !== "string") {
-        throw new Error(`Invalid task: ${id}`);
-      }
-      return [id, { title: task.title }];
-    })),
+    tasks: Object.fromEntries(Object.entries(data.tasks).map(([id, task]) => [id, decodeTask(id, task)])),
   };
+}
+
+function decodeTask(id: string, data: unknown): Task {
+  if (!isRecord(data) || typeof data.title !== "string"
+    || typeof data.completed !== "boolean") {
+    throw new Error(`Invalid task: ${id}`);
+  }
+  return { title: data.title, completed: data.completed };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -37,12 +37,15 @@ export default function App() {
   );
 }
 
+type ListMode = "schedule" | "completed";
+
 function AppSignedIn(props: {
   session: SignedIn;
   signOut: () => void;
   showNotice: (message: string) => void;
 }) {
   const [selectedTaskId, setSelectedTaskId] = createSignal<string>();
+  const [listMode, setListMode] = createSignal<ListMode>("schedule");
   const [userData, setUserData] = createSignal<UserData>(emptyUserData());
 
   createEffect(() => {
@@ -69,8 +72,23 @@ function AppSignedIn(props: {
           Sign out
         </button>
         <ProfilePhoto photoUrl={props.session.user.photoUrl} />
+        <select
+          value={listMode()}
+          onChange={(event) => {
+            const mode = event.currentTarget.value;
+            if (mode === "schedule" || mode === "completed") setListMode(mode);
+          }}
+        >
+          <option value="schedule">Schedule</option>
+          <option value="completed">Completed</option>
+        </select>
         <ul>
-          <For each={Object.entries(userData().tasks)}>
+          <For each={Object.entries(userData().tasks).filter(([, task]) => {
+            switch (listMode()) {
+              case "schedule": return !task.completed;
+              case "completed": return task.completed;
+            }
+          })}>
             {([taskId, task]) => (
               <li>
                 <button type="button" onClick={() => setSelectedTaskId(taskId)}>

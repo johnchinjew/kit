@@ -1,6 +1,6 @@
-import { createSignal, type JSX } from "solid-js";
+import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
-import { setTaskTitle, type Task } from "./userData";
+import { completeTask, setTaskTitle, type Task } from "./userData";
 
 export type TaskDraft = { id: string; task: Task; };
 
@@ -20,13 +20,25 @@ export default function Editor(props: {
   };
 
   const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    saveTitle();
+    props.onBack();
+  };
+
+  const onClickComplete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    saveTitle();
+    void completeTask(props.session.user.id, draft().id).catch(() => {
+      props.showNotice("Could not complete task. Try again later.");
+    });
+    props.onBack();
+  };
+
+  function saveTitle() {
     if (draft().task.title !== props.initialDraft.task.title) {
       void setTaskTitle(props.session.user.id, draft().id, draft().task.title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
-    props.onBack();
-  };
+  }
 
   return (
     <main>
@@ -39,6 +51,11 @@ export default function Editor(props: {
         value={draft().task.title}
         onInput={onChangeTitle}
       />
+      <Show when={!props.initialDraft.task.completed}>
+        <button type="button" onClick={onClickComplete}>
+          Complete
+        </button>
+      </Show>
     </main>
   );
 }
