@@ -8,7 +8,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { completeTask, createTask, setTaskTitle, subscribeUserData } from "../src/userData";
+import { completeTask, createTask, reopenTask, setTaskTitle, subscribeUserData } from "../src/userData";
 
 vi.mock("firebase/firestore", async (importOriginal) => ({
   ...await importOriginal<typeof import("firebase/firestore")>(),
@@ -117,6 +117,35 @@ describe("User data: task completion", () => {
 
     await expect(completeTask("alice", "first")).rejects.toBe(error);
     await expect(completeTask("alice", "first")).resolves.toBeUndefined();
+  });
+});
+
+describe("User data: task reopening", () => {
+  const firestore = {} as Firestore;
+  const userDocument = {} as DocumentReference;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFirestore).mockReturnValue(firestore);
+    vi.mocked(doc).mockReturnValue(userDocument);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+  });
+
+  it("targets only the selected task's completed flag, treating the ID as a literal map key", async () => {
+    await expect(reopenTask("alice", "task.with.dots")).resolves.toBeUndefined();
+
+    expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
+    expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
+      tasks: { "task.with.dots": { completed: false } },
+    }, { merge: true });
+  });
+
+  it("propagates write failures and allows another attempt", async () => {
+    const error = new Error("Save failed");
+    vi.mocked(setDoc).mockRejectedValueOnce(error);
+
+    await expect(reopenTask("alice", "first")).rejects.toBe(error);
+    await expect(reopenTask("alice", "first")).resolves.toBeUndefined();
   });
 });
 

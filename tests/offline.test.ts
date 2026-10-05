@@ -13,7 +13,7 @@ import {
   waitForPendingWrites,
 } from "firebase/firestore";
 import { expect, it, vi } from "vitest";
-import { completeTask, createTask, setTaskTitle } from "../src/userData";
+import { completeTask, createTask, reopenTask, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -23,7 +23,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   return { ...firestore, initializeFirestore: vi.fn(firestore.initializeFirestore) };
 });
 
-it("retains offline task creation, title editing, and completion across a restart, then syncs", async () => {
+it("retains offline task creation, title editing, completion, and reopening across restarts, then syncs", async () => {
   const storage = new Map<string, string>();
   vi.stubGlobal("window", {
     location: { hostname: "localhost" },
@@ -68,14 +68,30 @@ it("retains offline task creation, title editing, and completion across a restar
     firestore = initializeFirestore(app, settings);
     connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-user" } });
     await disableNetwork(firestore);
-    const restoredDocument = doc(firestore, "users", "offline-user");
-    const restored = await getDocFromCache(restoredDocument);
-    expect(restored.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: true } } });
-    expect(restored.metadata.hasPendingWrites).toBe(true);
+    const restartedDocument = doc(firestore, "users", "offline-user");
+    const cachedAfterRestart = await getDocFromCache(restartedDocument);
+    expect(cachedAfterRestart.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: true } } });
+    expect(cachedAfterRestart.metadata.hasPendingWrites).toBe(true);
+
+    void reopenTask("offline-user", taskId).catch(() => {});
+    expect((await getDocFromCache(restartedDocument)).data()).toEqual({
+      tasks: { [taskId]: { title: "Buy bread", completed: false } },
+    });
+
+    await terminate(firestore);
+    await deleteApp(app);
+    app = initializeApp(options);
+    firestore = initializeFirestore(app, settings);
+    connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-user" } });
+    await disableNetwork(firestore);
+    const finalDocument = doc(firestore, "users", "offline-user");
+    const final = await getDocFromCache(finalDocument);
+    expect(final.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: false } } });
+    expect(final.metadata.hasPendingWrites).toBe(true);
 
     await enableNetwork(firestore);
     await waitForPendingWrites(firestore);
-    expect((await getDocFromServer(restoredDocument)).data()).toEqual(restored.data());
+    expect((await getDocFromServer(finalDocument)).data()).toEqual(final.data());
   } finally {
     await terminate(firestore);
     await deleteApp(app);

@@ -31,6 +31,12 @@ export async function completeTask(userId: string, taskId: string): Promise<void
   }, { merge: true });
 }
 
+export async function reopenTask(userId: string, taskId: string): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    tasks: { [taskId]: { completed: false } },
+  }, { merge: true });
+}
+
 export function subscribeUserData(
   userId: string,
   onUserData: (userData: UserData) => void,

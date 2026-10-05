@@ -120,20 +120,23 @@ describe("Firestore security rules", () => {
     });
   });
 
-  it("merges task completion with a concurrent title edit and preserves other fields", async () => {
+  it.each([
+    { operation: "completion", completed: true },
+    { operation: "reopening", completed: false },
+  ])("merges task $operation with a concurrent title edit and preserves other fields", async ({ completed }) => {
     const firstClient = testEnvironment.authenticatedContext("alice").firestore();
     const secondClient = testEnvironment.authenticatedContext("alice").firestore();
     const userDocument = doc(firstClient, "users/alice");
     await setDoc(userDocument, {
       tasks: {
-        "task.with.dots": { title: "Buy milk", details: "Whole milk" },
+        "task.with.dots": { title: "Buy milk", details: "Whole milk", completed: !completed },
         other: { title: "Walk dog" },
       },
     });
 
     await Promise.all([
       setDoc(userDocument, {
-        tasks: { "task.with.dots": { completed: true } },
+        tasks: { "task.with.dots": { completed } },
       }, { merge: true }),
       setDoc(doc(secondClient, "users/alice"), {
         tasks: { "task.with.dots": { title: "Buy bread" } },
@@ -142,7 +145,7 @@ describe("Firestore security rules", () => {
 
     expect((await getDoc(userDocument)).data()).toEqual({
       tasks: {
-        "task.with.dots": { title: "Buy bread", details: "Whole milk", completed: true },
+        "task.with.dots": { title: "Buy bread", details: "Whole milk", completed },
         other: { title: "Walk dog" },
       },
     });

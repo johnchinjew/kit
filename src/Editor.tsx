@@ -1,6 +1,6 @@
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
-import { completeTask, setTaskTitle, type Task } from "./userData";
+import { completeTask, reopenTask, setTaskTitle, type Task } from "./userData";
 
 export type TaskDraft = { id: string; task: Task; };
 
@@ -32,6 +32,14 @@ export default function Editor(props: {
     props.onBack();
   };
 
+  const onClickReopen: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    saveTitle();
+    void reopenTask(props.session.user.id, draft().id).catch(() => {
+      props.showNotice("Could not reopen task. Try again later.");
+    });
+    props.onBack();
+  };
+
   function saveTitle() {
     if (draft().task.title !== props.initialDraft.task.title) {
       void setTaskTitle(props.session.user.id, draft().id, draft().task.title).catch(() => {
@@ -54,6 +62,11 @@ export default function Editor(props: {
       <Show when={!props.initialDraft.task.completed}>
         <button type="button" onClick={onClickComplete}>
           Complete
+        </button>
+      </Show>
+      <Show when={props.initialDraft.task.completed}>
+        <button type="button" onClick={onClickReopen}>
+          Reopen
         </button>
       </Show>
     </main>
