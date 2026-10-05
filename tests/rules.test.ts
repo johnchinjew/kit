@@ -151,6 +151,24 @@ describe("Firestore security rules", () => {
     });
   });
 
+  it("merges concurrent title and date edits to the same task", async () => {
+    const firstClient = testEnvironment.authenticatedContext("alice").firestore();
+    const secondClient = testEnvironment.authenticatedContext("alice").firestore();
+    const userDocument = doc(firstClient, "users/alice");
+    await setDoc(userDocument, {
+      tasks: { first: { title: "Buy milk", completed: false, date: "2026-10-04" } },
+    });
+
+    await Promise.all([
+      setDoc(userDocument, { tasks: { first: { title: "Buy bread" } } }, { merge: true }),
+      setDoc(doc(secondClient, "users/alice"), { tasks: { first: { date: "2026-10-05" } } }, { merge: true }),
+    ]);
+
+    expect((await getDoc(userDocument)).data()).toEqual({
+      tasks: { first: { title: "Buy bread", completed: false, date: "2026-10-05" } },
+    });
+  });
+
   it("denies access to another user's document", async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), "users/bob"), { name: "Bob" });

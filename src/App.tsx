@@ -88,12 +88,18 @@ function AppSignedIn(props: {
               case "schedule": return !task.completed;
               case "completed": return task.completed;
             }
+          }).sort(([, left], [, right]) => {
+            switch (listMode()) {
+              case "schedule": return left.date.localeCompare(right.date);
+              case "completed": return 0;
+            }
           })}>
             {([taskId, task]) => (
               <li>
                 <button type="button" onClick={() => setSelectedTaskId(taskId)}>
                   {task.title}
                 </button>
+                <time>{task.date}</time>
               </li>
             )}
           </For>
@@ -107,7 +113,8 @@ function AppSignedIn(props: {
           <Show when={userData().tasks[taskId()]} fallback={<p>Loading task</p>}>
             {(task) => (
               <Editor
-                initialDraft={{ id: taskId(), task: task() }}
+                taskId={taskId()}
+                task={task()}
                 session={props.session}
                 showNotice={props.showNotice}
                 onBack={() => setSelectedTaskId(undefined)}

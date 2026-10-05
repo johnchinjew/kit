@@ -1,51 +1,96 @@
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
-import { completeTask, reopenTask, setTaskTitle, type Task } from "./userData";
+import { decodeDate, oneYearFromToday, type TaskDate } from "./date";
+import {
+  completeTask,
+  reopenTask,
+  setTaskDate,
+  setTaskTitle,
+  type Task
+} from "./userData";
 
-export type TaskDraft = { id: string; task: Task; };
+type TaskDraft = {
+  title: string;
+  completed: boolean;
+  date: string;
+};
 
 export default function Editor(props: {
-  initialDraft: TaskDraft;
+  taskId: string;
+  task: Task;
   session: SignedIn;
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
-  const [draft, setDraft] = createSignal<TaskDraft>(props.initialDraft);
+  // Capture the task when the editor opens so unmodified fields don't overwrite remote edits
+  const initialTask = props.task;
+  const [draft, setDraft] = createSignal<TaskDraft>(initialTask);
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.initialDraft.task.completed) return;
+    if (props.task.completed) return;
     setDraft((current) => ({
       ...current,
-      task: { ...current.task, title: event.currentTarget.value }
+      title: event.currentTarget.value
+    }));
+  };
+
+  const onChangeDate: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
+    if (props.task.completed) return;
+    setDraft((current) => ({
+      ...current,
+      date: event.currentTarget.value
     }));
   };
 
   const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    if (!saveDate()) return;
     saveTitle();
     props.onBack();
   };
 
   const onClickComplete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    if (!saveDate()) return;
     saveTitle();
-    void completeTask(props.session.user.id, draft().id).catch(() => {
+    void completeTask(props.session.user.id, props.taskId).catch(() => {
       props.showNotice("Could not complete task. Try again later.");
     });
     props.onBack();
   };
 
   const onClickReopen: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
-    void reopenTask(props.session.user.id, draft().id).catch(() => {
+    void reopenTask(props.session.user.id, props.taskId).catch(() => {
       props.showNotice("Could not reopen task. Try again later.");
     });
     props.onBack();
   };
 
   function saveTitle() {
-    if (!props.initialDraft.task.completed && draft().task.title !== props.initialDraft.task.title) {
-      void setTaskTitle(props.session.user.id, draft().id, draft().task.title).catch(() => {
+    if (!props.task.completed && draft().title !== initialTask.title) {
+      void setTaskTitle(props.session.user.id, props.taskId, draft().title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
+  }
+
+  function saveDate() {
+    const date = draft().date;
+    if (!props.task.completed && date !== initialTask.date) {
+      let validatedDate: TaskDate;
+      try {
+        validatedDate = decodeDate(date);
+      } catch {
+        props.showNotice("A date is required.");
+        return false;
+      }
+      if (validatedDate > oneYearFromToday()) {
+        props.showNotice("The date cannot be more than 1 year in the future.");
+        return false;
+      }
+      void setTaskDate(props.session.user.id, props.taskId, validatedDate).catch(() => {
+        props.showNotice("Could not save task. Try again later.");
+      });
+    }
+    return true;
   }
 
   return (
@@ -56,16 +101,24 @@ export default function Editor(props: {
       <input
         name="title"
         type="text"
-        value={draft().task.title}
-        readOnly={props.initialDraft.task.completed}
+        value={draft().title}
+        readOnly={props.task.completed}
         onInput={onChangeTitle}
       />
-      <Show when={!props.initialDraft.task.completed}>
+      <input
+        name="date"
+        type="date"
+        max={oneYearFromToday()}
+        value={draft().date}
+        readOnly={props.task.completed}
+        onInput={onChangeDate}
+      />
+      <Show when={!props.task.completed}>
         <button type="button" onClick={onClickComplete}>
           Complete
         </button>
       </Show>
-      <Show when={props.initialDraft.task.completed}>
+      <Show when={props.task.completed}>
         <button type="button" onClick={onClickReopen}>
           Reopen
         </button>

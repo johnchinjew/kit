@@ -4,10 +4,11 @@ import {
   onSnapshot,
   setDoc,
 } from "firebase/firestore";
+import { decodeDate, today, type TaskDate } from "./date";
 
 export type UserData = { tasks: Record<string, Task>; };
 
-export type Task = { title: string; completed: boolean; };
+export type Task = { title: string; completed: boolean; date: TaskDate; };
 
 export function emptyUserData(): UserData {
   return { tasks: {} };
@@ -15,13 +16,19 @@ export function emptyUserData(): UserData {
 
 export async function createTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { title: "", completed: false } },
+    tasks: { [taskId]: { title: "", completed: false, date: today() } },
   }, { merge: true });
 }
 
 export async function setTaskTitle(userId: string, taskId: string, title: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
     tasks: { [taskId]: { title } },
+  }, { merge: true });
+}
+
+export async function setTaskDate(userId: string, taskId: string, date: TaskDate): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    tasks: { [taskId]: { date } },
   }, { merge: true });
 }
 
@@ -66,11 +73,21 @@ function decodeUserData(data: unknown): UserData {
 }
 
 function decodeTask(id: string, data: unknown): Task {
-  if (!isRecord(data) || typeof data.title !== "string"
-    || typeof data.completed !== "boolean") {
-    throw new Error(`Invalid task: ${id}`);
+  if (
+    !isRecord(data)
+    || typeof data.title !== "string"
+    || typeof data.completed !== "boolean"
+    || typeof data.date !== "string"
+  ) {
+    throw new Error(`Invalid task ${id}`);
   }
-  return { title: data.title, completed: data.completed };
+  let date: TaskDate;
+  try {
+    date = decodeDate(data.date);
+  } catch {
+    throw new Error(`Invalid task ${id}: invalid date`);
+  }
+  return { title: data.title, completed: data.completed, date };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

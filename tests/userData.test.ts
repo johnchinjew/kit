@@ -7,8 +7,9 @@ import {
   type DocumentSnapshot,
   type Firestore,
 } from "firebase/firestore";
+import { decodeDate, today } from "../src/date";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { completeTask, createTask, reopenTask, setTaskTitle, subscribeUserData } from "../src/userData";
+import { completeTask, createTask, reopenTask, setTaskDate, setTaskTitle, subscribeUserData } from "../src/userData";
 
 vi.mock("firebase/firestore", async (importOriginal) => ({
   ...await importOriginal<typeof import("firebase/firestore")>(),
@@ -34,7 +35,7 @@ describe("User data: task creation", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { first: { title: "", completed: false } },
+      tasks: { first: { title: "", completed: false, date: today() } },
     }, { merge: true });
   });
 
@@ -88,6 +89,33 @@ describe("User data: task title editing", () => {
     vi.mocked(setDoc).mockImplementationOnce(() => { throw error; });
 
     await expect(setTaskTitle("alice", "first", "Buy bread")).rejects.toBe(error);
+  });
+});
+
+describe("User data: task date editing", () => {
+  const firestore = {} as Firestore;
+  const userDocument = {} as DocumentReference;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFirestore).mockReturnValue(firestore);
+    vi.mocked(doc).mockReturnValue(userDocument);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+  });
+
+  it("merges only the selected task's date", async () => {
+    await setTaskDate("alice", "task.with.dots", decodeDate("2026-10-04"));
+
+    expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
+    expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
+      tasks: { "task.with.dots": { date: "2026-10-04" } },
+    }, { merge: true });
+  });
+
+  it("propagates write failures", async () => {
+    const error = new Error("Save failed");
+    vi.mocked(setDoc).mockRejectedValueOnce(error);
+    await expect(setTaskDate("alice", "first", decodeDate("2026-10-04"))).rejects.toBe(error);
   });
 });
 
@@ -181,22 +209,22 @@ describe("User data: subscription", () => {
     receive({
       data: () => ({
         futureField: { enabled: true }, tasks: {
-          first: { title: "Buy milk", completed: false, details: "Whole milk" },
-          second: { title: "Walk dog", completed: false },
+          first: { title: "Buy milk", completed: false, date: "2026-10-04", details: "Whole milk" },
+          second: { title: "Walk dog", completed: false, date: "2026-10-04" },
         }
       })
     } as unknown as DocumentSnapshot);
     expect(onUserData).toHaveBeenLastCalledWith({
       tasks: {
-        first: { title: "Buy milk", completed: false },
-        second: { title: "Walk dog", completed: false },
+        first: { title: "Buy milk", completed: false, date: "2026-10-04" },
+        second: { title: "Walk dog", completed: false, date: "2026-10-04" },
       }
     });
 
     receive({
-      data: () => ({ tasks: { second: { title: "Walk dog again", completed: false } } }),
+      data: () => ({ tasks: { second: { title: "Walk dog again", completed: false, date: "2026-10-04" } } }),
     } as unknown as DocumentSnapshot);
-    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", completed: false } } });
+    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", completed: false, date: "2026-10-04" } } });
   });
 
   it("reads incomplete and completed tasks", () => {
@@ -208,14 +236,14 @@ describe("User data: subscription", () => {
 
     receive({
       data: () => ({ tasks: {
-        incomplete: { title: "Walk dog", completed: false },
-        completed: { title: "Buy bread", completed: true },
+        incomplete: { title: "Walk dog", completed: false, date: "2026-10-04" },
+        completed: { title: "Buy bread", completed: true, date: "2026-10-04" },
       } }),
     } as unknown as DocumentSnapshot);
 
     expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {
-      incomplete: { title: "Walk dog", completed: false },
-      completed: { title: "Buy bread", completed: true },
+      incomplete: { title: "Walk dog", completed: false, date: "2026-10-04" },
+      completed: { title: "Buy bread", completed: true, date: "2026-10-04" },
     } });
     expect(onError).not.toHaveBeenCalled();
   });
@@ -252,9 +280,13 @@ describe("User data: subscription", () => {
     },
   );
 
-  it.each([{}, { title: 42, completed: false }, { title: "Buy milk" },
-    { title: "Buy milk", completed: "true" },
-    { title: "Buy milk", completed: null }, { title: "Buy milk", completed: undefined },
+  it.each([{}, { title: 42, completed: false, date: "2026-10-04" }, { title: "Buy milk", date: "2026-10-04" },
+    { title: "Buy milk", completed: false },
+    { title: "Buy milk", completed: false, date: undefined },
+    { title: "Buy milk", completed: "true", date: "2026-10-04" },
+    { title: "Buy milk", completed: null, date: "2026-10-04" }, { title: "Buy milk", completed: undefined, date: "2026-10-04" },
+    { title: "Buy milk", completed: false, date: null },
+    { title: "Buy milk", completed: false, date: 42 },
     null, Object.assign([], { title: "Invalid array" })])(
     "rejects a malformed task and resumes publishing when data becomes readable: %j",
     (task) => {
@@ -263,20 +295,22 @@ describe("User data: subscription", () => {
       subscribeUserData("alice", onUserData, onError);
       const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
         (snapshot: DocumentSnapshot) => void;
-      const valid = { tasks: { valid: { title: "Buy milk", completed: false } } };
+      const valid = { tasks: { valid: { title: "Buy milk", completed: false, date: "2026-10-04" } } };
 
       receive({ data: () => valid } as unknown as DocumentSnapshot);
       receive({
         data: () => ({
           tasks: {
-            valid: { title: "Changed title", completed: false },
+            valid: { title: "Changed title", completed: false, date: "2026-10-04" },
             malformed: task,
           }
         })
       } as unknown as DocumentSnapshot);
 
       expect(onUserData).toHaveBeenCalledExactlyOnceWith(valid);
-      expect(onError).toHaveBeenCalledExactlyOnceWith(new Error("Invalid task: malformed"));
+      expect(onError).toHaveBeenCalledExactlyOnceWith(new Error(
+        "Invalid task malformed",
+      ));
 
       receive({ data: () => ({ tasks: {} }) } as unknown as DocumentSnapshot);
 
@@ -286,6 +320,23 @@ describe("User data: subscription", () => {
       expect(setDoc).not.toHaveBeenCalled();
     },
   );
+
+  it.each(["2026-02-30", "10/04/2026", ""])("reports the task ID and date requirement for invalid date %j", (date) => {
+    const onUserData = vi.fn();
+    const onError = vi.fn();
+    subscribeUserData("alice", onUserData, onError);
+    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      (snapshot: DocumentSnapshot) => void;
+
+    receive({
+      data: () => ({ tasks: { malformed: { title: "Buy milk", completed: false, date } } }),
+    } as unknown as DocumentSnapshot);
+
+    expect(onUserData).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledExactlyOnceWith(new Error(
+      "Invalid task malformed: invalid date",
+    ));
+  });
 
   it("does not report consumer exceptions as malformed data", () => {
     const error = new Error("Consumer failed");

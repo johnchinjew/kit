@@ -12,8 +12,9 @@ import {
   terminate,
   waitForPendingWrites,
 } from "firebase/firestore";
+import { decodeDate, today } from "../src/date";
 import { expect, it, vi } from "vitest";
-import { completeTask, createTask, reopenTask, setTaskTitle } from "../src/userData";
+import { completeTask, createTask, reopenTask, setTaskDate, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -23,7 +24,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   return { ...firestore, initializeFirestore: vi.fn(firestore.initializeFirestore) };
 });
 
-it("retains offline task creation, title editing, completion, and reopening across restarts, then syncs", async () => {
+it("retains offline task creation, title and date editing, completion, and reopening across restarts, then syncs", async () => {
   const storage = new Map<string, string>();
   vi.stubGlobal("window", {
     location: { hostname: "localhost" },
@@ -55,11 +56,12 @@ it("retains offline task creation, title editing, completion, and reopening acro
     void createTask("offline-user", taskId).catch(() => {});
     const userDocument = doc(firestore, "users", "offline-user");
     const created = await getDocFromCache(userDocument);
-    expect(created.data()).toEqual({ tasks: { [taskId]: { title: "", completed: false } } });
+    expect(created.data()).toEqual({ tasks: { [taskId]: { title: "", completed: false, date: today() } } });
     void setTaskTitle("offline-user", taskId, "Buy bread").catch(() => {});
+    void setTaskDate("offline-user", taskId, decodeDate("2026-10-05")).catch(() => {});
     void completeTask("offline-user", taskId).catch(() => {});
     expect((await getDocFromCache(userDocument)).data()).toEqual({
-      tasks: { [taskId]: { title: "Buy bread", completed: true } },
+      tasks: { [taskId]: { title: "Buy bread", completed: true, date: "2026-10-05" } },
     });
 
     await terminate(firestore);
@@ -70,12 +72,12 @@ it("retains offline task creation, title editing, completion, and reopening acro
     await disableNetwork(firestore);
     const restartedDocument = doc(firestore, "users", "offline-user");
     const cachedAfterRestart = await getDocFromCache(restartedDocument);
-    expect(cachedAfterRestart.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: true } } });
+    expect(cachedAfterRestart.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: true, date: "2026-10-05" } } });
     expect(cachedAfterRestart.metadata.hasPendingWrites).toBe(true);
 
     void reopenTask("offline-user", taskId).catch(() => {});
     expect((await getDocFromCache(restartedDocument)).data()).toEqual({
-      tasks: { [taskId]: { title: "Buy bread", completed: false } },
+      tasks: { [taskId]: { title: "Buy bread", completed: false, date: "2026-10-05" } },
     });
 
     await terminate(firestore);
@@ -86,7 +88,7 @@ it("retains offline task creation, title editing, completion, and reopening acro
     await disableNetwork(firestore);
     const finalDocument = doc(firestore, "users", "offline-user");
     const final = await getDocFromCache(finalDocument);
-    expect(final.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: false } } });
+    expect(final.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: false, date: "2026-10-05" } } });
     expect(final.metadata.hasPendingWrites).toBe(true);
 
     await enableNetwork(firestore);
