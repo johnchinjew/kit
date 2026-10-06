@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import Editor from "./Editor";
-import { formatDate } from "./date";
+import { formatTaskDate } from "./taskDate";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn, type SigningOut } from "./session";
 import { createTask, emptyUserData, subscribeUserData, type UserData } from "./userData";
@@ -100,7 +100,7 @@ function AppSignedIn(props: {
                 <button type="button" onClick={() => setSelectedTaskId(taskId)}>
                   {task.title}
                 </button>
-                <time dateTime={task.date}>{formatDate(task.date)}</time>
+                <time dateTime={task.date}>{formatTaskDate(task.date)}</time>
               </li>
             )}
           </For>

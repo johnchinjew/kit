@@ -8,7 +8,7 @@ import {
   type DocumentSnapshot,
   type Firestore,
 } from "firebase/firestore";
-import { decodeDate, today } from "../src/date";
+import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { completeTask, createTask, reopenTask, setTaskDate, setTaskTitle, subscribeUserData } from "../src/userData";
 
@@ -38,7 +38,7 @@ describe("User data: task creation", () => {
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "createTask", taskId: "first" },
       tasks: { first: {
-        title: "", completed: false, date: today(),
+        title: "", completed: false, date: taskDateToday(),
         titleEditedAt: expect.any(Timestamp),
         dateEditedAt: expect.any(Timestamp),
         completedEditedAt: expect.any(Timestamp),
@@ -137,7 +137,7 @@ describe("User data: task date editing", () => {
   });
 
   it("merges only the selected task's date", async () => {
-    await setTaskDate("alice", "task.with.dots", decodeDate("2026-10-04"));
+    await setTaskDate("alice", "task.with.dots", decodeTaskDate("2026-10-04"));
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
@@ -152,7 +152,7 @@ describe("User data: task date editing", () => {
   it("propagates write failures", async () => {
     const error = new Error("Save failed");
     vi.mocked(setDoc).mockRejectedValueOnce(error);
-    await expect(setTaskDate("alice", "first", decodeDate("2026-10-04"))).rejects.toBe(error);
+    await expect(setTaskDate("alice", "first", decodeTaskDate("2026-10-04"))).rejects.toBe(error);
   });
 });
 

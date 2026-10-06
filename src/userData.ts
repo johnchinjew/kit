@@ -5,7 +5,7 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
-import { decodeDate, today, type TaskDate } from "./date";
+import { decodeTaskDate, taskDateToday, type TaskDate } from "./taskDate";
 
 export type UserData = { tasks: Record<string, Task>; };
 
@@ -23,7 +23,7 @@ export async function createTask(userId: string, taskId: string): Promise<void> 
       [taskId]: {
         title: "",
         completed: false,
-        date: today(),
+        date: taskDateToday(),
         titleEditedAt: editedAt,
         completedEditedAt: editedAt,
         dateEditedAt: editedAt,
@@ -99,7 +99,7 @@ function decodeTask(id: string, data: unknown): Task {
   }
   let date: TaskDate;
   try {
-    date = decodeDate(data.date);
+    date = decodeTaskDate(data.date);
   } catch {
     throw new Error(`Invalid task ${id}: invalid date`);
   }

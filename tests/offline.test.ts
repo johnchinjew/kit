@@ -13,7 +13,7 @@ import {
   Timestamp,
   waitForPendingWrites,
 } from "firebase/firestore";
-import { decodeDate, today } from "../src/date";
+import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { expect, it, vi } from "vitest";
 import { completeTask, createTask, reopenTask, setTaskDate, setTaskTitle } from "../src/userData";
 
@@ -62,7 +62,7 @@ it("retains offline task creation, title and date editing, completion, and reope
     const created = await getDocFromCache(userDocument);
     expect(created.data()).toEqual({
       operation: { type: "createTask", taskId }, tasks: { [taskId]: {
-        title: "", completed: false, date: today(),
+        title: "", completed: false, date: taskDateToday(),
         titleEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
         completedEditedAt: expect.any(Timestamp),
       } },
@@ -70,7 +70,7 @@ it("retains offline task creation, title and date editing, completion, and reope
     clock.mockReturnValue(Timestamp.fromMillis(startTime + 1_000));
     void setTaskTitle("offline-user", taskId, "Buy bread").catch(() => {});
     clock.mockReturnValue(Timestamp.fromMillis(startTime + 2_000));
-    void setTaskDate("offline-user", taskId, decodeDate("2026-10-05")).catch(() => {});
+    void setTaskDate("offline-user", taskId, decodeTaskDate("2026-10-05")).catch(() => {});
     clock.mockReturnValue(Timestamp.fromMillis(startTime + 3_000));
     void completeTask("offline-user", taskId).catch(() => {});
     const completedData = (await getDocFromCache(userDocument)).data();

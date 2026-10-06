@@ -1,6 +1,6 @@
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
-import { decodeDate, oneYearFromToday, type TaskDate } from "./date";
+import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import {
   completeTask,
   reopenTask,
@@ -77,12 +77,12 @@ export default function Editor(props: {
     if (!props.task.completed && date !== initialTask.date) {
       let validatedDate: TaskDate;
       try {
-        validatedDate = decodeDate(date);
+        validatedDate = decodeTaskDate(date);
       } catch {
         props.showNotice("A date is required.");
         return false;
       }
-      if (validatedDate > oneYearFromToday()) {
+      if (validatedDate > taskDateOneYearFromToday()) {
         props.showNotice("The date cannot be more than 1 year in the future.");
         return false;
       }
@@ -108,7 +108,7 @@ export default function Editor(props: {
       <input
         name="date"
         type="date"
-        max={oneYearFromToday()}
+        max={taskDateOneYearFromToday()}
         value={draft().date}
         readOnly={props.task.completed}
         onInput={onChangeDate}
