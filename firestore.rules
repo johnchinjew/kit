@@ -3,8 +3,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow get, create, update:
-        if request.auth != null && request.auth.uid == userId;
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && validWrite({});
+      allow update: if isOwner(userId) && validWrite(resource.data);
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validWrite(oldData) {
+      let data = request.resource.data;
+      return data.operation is map
+        && data.operation.type is string
+        && validTaskWrite(data, oldData);
+    }
+
+    function validTaskWrite(data, oldData) {
+      let oldTasks = oldData.get('tasks', {});
+      let operationType = data.operation.type;
+      let taskId = data.operation.taskId;
+      return oldTasks is map
+        && taskId is string
+        && data.tasks is map
+        && taskId in data.tasks
+        && (
+          (operationType == 'createTask'
+            && !(taskId in oldTasks) && validTaskCreation(data.tasks[taskId]))
+          || (operationType in ['setTaskTitle', 'setTaskDate', 'completeTask', 'reopenTask']
+            && taskId in oldTasks && validTaskEdit(data.tasks[taskId], oldTasks[taskId], operationType))
+        );
+    }
+
+    function validTaskCreation(task) {
+      return task is map
+        && validEditTime(task.titleEditedAt)
+        && validEditTime(task.dateEditedAt)
+        && validEditTime(task.completedEditedAt);
+    }
+
+    function validTaskEdit(task, oldTask, operationType) {
+      return task is map && oldTask is map && (
+        (operationType == 'setTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
+        || (operationType == 'setTaskDate' && newerEdit(task, oldTask, 'dateEditedAt'))
+        || (operationType == 'completeTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        || (operationType == 'reopenTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+      );
+    }
+
+    function newerEdit(data, oldData, field) {
+      return validEditTime(data[field])
+        && data[field] > oldData.get(field, timestamp.value(0));
+    }
+
+    function validEditTime(value) {
+      return value is timestamp
+        && value >= timestamp.value(0)
+        && value <= request.time + duration.value(5, 'm');
     }
   }
 }

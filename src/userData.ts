@@ -3,6 +3,7 @@ import {
   getFirestore,
   onSnapshot,
   setDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { decodeDate, today, type TaskDate } from "./date";
 
@@ -15,32 +16,47 @@ export function emptyUserData(): UserData {
 }
 
 export async function createTask(userId: string, taskId: string): Promise<void> {
+  const editedAt = Timestamp.now();
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { title: "", completed: false, date: today() } },
+    operation: { type: "createTask", taskId },
+    tasks: {
+      [taskId]: {
+        title: "",
+        completed: false,
+        date: today(),
+        titleEditedAt: editedAt,
+        completedEditedAt: editedAt,
+        dateEditedAt: editedAt,
+      }
+    },
   }, { merge: true });
 }
 
 export async function setTaskTitle(userId: string, taskId: string, title: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { title } },
-  }, { merge: true });
-}
-
-export async function setTaskDate(userId: string, taskId: string, date: TaskDate): Promise<void> {
-  await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { date } },
+    operation: { type: "setTaskTitle", taskId },
+    tasks: { [taskId]: { title, titleEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
 export async function completeTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { completed: true } },
+    operation: { type: "completeTask", taskId },
+    tasks: { [taskId]: { completed: true, completedEditedAt: Timestamp.now() } },
+  }, { merge: true });
+}
+
+export async function setTaskDate(userId: string, taskId: string, date: TaskDate): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    operation: { type: "setTaskDate", taskId },
+    tasks: { [taskId]: { date, dateEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
 export async function reopenTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    tasks: { [taskId]: { completed: false } },
+    operation: { type: "reopenTask", taskId },
+    tasks: { [taskId]: { completed: false, completedEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 

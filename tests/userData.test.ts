@@ -3,6 +3,7 @@ import {
   getFirestore,
   onSnapshot,
   setDoc,
+  Timestamp,
   type DocumentReference,
   type DocumentSnapshot,
   type Firestore,
@@ -35,8 +36,36 @@ describe("User data: task creation", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { first: { title: "", completed: false, date: today() } },
+      operation: { type: "createTask", taskId: "first" },
+      tasks: { first: {
+        title: "", completed: false, date: today(),
+        titleEditedAt: expect.any(Timestamp),
+        dateEditedAt: expect.any(Timestamp),
+        completedEditedAt: expect.any(Timestamp),
+      } },
     }, { merge: true });
+  });
+
+  it("uses the client clock for creation and subsequent edits", async () => {
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      await createTask("alice", "first");
+      const created = vi.mocked(setDoc).mock.calls[0]![1];
+      expect(created).toMatchObject({ tasks: { first: {
+        titleEditedAt: Timestamp.fromMillis(now),
+        dateEditedAt: Timestamp.fromMillis(now),
+        completedEditedAt: Timestamp.fromMillis(now),
+      } } });
+
+      clock.mockReturnValue(now + 1_000);
+      await setTaskTitle("alice", "first", "Bread");
+      expect(vi.mocked(setDoc).mock.calls[1]![1]).toMatchObject({ tasks: { first: {
+        titleEditedAt: Timestamp.fromMillis(now + 1_000),
+      } } });
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("propagates asynchronous write failures and allows further writes", async () => {
@@ -72,7 +101,11 @@ describe("User data: task title editing", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { "task.with.dots": { title: "Buy bread" } },
+      operation: { type: "setTaskTitle", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": {
+        title: "Buy bread",
+        titleEditedAt: expect.any(Timestamp),
+      } },
     }, { merge: true });
   });
 
@@ -108,7 +141,11 @@ describe("User data: task date editing", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { "task.with.dots": { date: "2026-10-04" } },
+      operation: { type: "setTaskDate", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": {
+        date: "2026-10-04",
+        dateEditedAt: expect.any(Timestamp),
+      } },
     }, { merge: true });
   });
 
@@ -135,7 +172,11 @@ describe("User data: task completion", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { "task.with.dots": { completed: true } },
+      operation: { type: "completeTask", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": {
+        completed: true,
+        completedEditedAt: expect.any(Timestamp),
+      } },
     }, { merge: true });
   });
 
@@ -164,7 +205,11 @@ describe("User data: task reopening", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      tasks: { "task.with.dots": { completed: false } },
+      operation: { type: "reopenTask", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": {
+        completed: false,
+        completedEditedAt: expect.any(Timestamp),
+      } },
     }, { merge: true });
   });
 
@@ -208,8 +253,13 @@ describe("User data: subscription", () => {
 
     receive({
       data: () => ({
+        operation: { type: "setTaskTitle", taskId: "first" },
         futureField: { enabled: true }, tasks: {
-          first: { title: "Buy milk", completed: false, date: "2026-10-04", details: "Whole milk" },
+          first: {
+            title: "Buy milk", completed: false, date: "2026-10-04",
+            titleEditedAt: Timestamp.now(),
+            details: "Whole milk",
+          },
           second: { title: "Walk dog", completed: false, date: "2026-10-04" },
         }
       })

@@ -10,6 +10,7 @@ import {
   getFirestore,
   initializeFirestore,
   terminate,
+  Timestamp,
   waitForPendingWrites,
 } from "firebase/firestore";
 import { decodeDate, today } from "../src/date";
@@ -49,6 +50,9 @@ it("retains offline task creation, title and date editing, completion, and reope
   // Reuse the startup configuration so this catches a regression to memory caching.
   const settings = vi.mocked(initializeFirestore).mock.calls[0]![1];
 
+  const startTime = Date.now() - 60_000;
+  const clock = vi.spyOn(Timestamp, "now").mockReturnValue(Timestamp.fromMillis(startTime));
+
   try {
     connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-user" } });
     await disableNetwork(firestore);
@@ -56,11 +60,22 @@ it("retains offline task creation, title and date editing, completion, and reope
     void createTask("offline-user", taskId).catch(() => {});
     const userDocument = doc(firestore, "users", "offline-user");
     const created = await getDocFromCache(userDocument);
-    expect(created.data()).toEqual({ tasks: { [taskId]: { title: "", completed: false, date: today() } } });
+    expect(created.data()).toEqual({
+      operation: { type: "createTask", taskId }, tasks: { [taskId]: {
+        title: "", completed: false, date: today(),
+        titleEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
+        completedEditedAt: expect.any(Timestamp),
+      } },
+    });
+    clock.mockReturnValue(Timestamp.fromMillis(startTime + 1_000));
     void setTaskTitle("offline-user", taskId, "Buy bread").catch(() => {});
+    clock.mockReturnValue(Timestamp.fromMillis(startTime + 2_000));
     void setTaskDate("offline-user", taskId, decodeDate("2026-10-05")).catch(() => {});
+    clock.mockReturnValue(Timestamp.fromMillis(startTime + 3_000));
     void completeTask("offline-user", taskId).catch(() => {});
-    expect((await getDocFromCache(userDocument)).data()).toEqual({
+    const completedData = (await getDocFromCache(userDocument)).data();
+    expect(completedData).toMatchObject({
+      operation: { type: "completeTask", taskId },
       tasks: { [taskId]: { title: "Buy bread", completed: true, date: "2026-10-05" } },
     });
 
@@ -72,11 +87,14 @@ it("retains offline task creation, title and date editing, completion, and reope
     await disableNetwork(firestore);
     const restartedDocument = doc(firestore, "users", "offline-user");
     const cachedAfterRestart = await getDocFromCache(restartedDocument);
-    expect(cachedAfterRestart.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: true, date: "2026-10-05" } } });
+    expect(cachedAfterRestart.data()).toEqual(completedData);
     expect(cachedAfterRestart.metadata.hasPendingWrites).toBe(true);
 
+    clock.mockReturnValue(Timestamp.fromMillis(startTime + 4_000));
     void reopenTask("offline-user", taskId).catch(() => {});
-    expect((await getDocFromCache(restartedDocument)).data()).toEqual({
+    const reopenedData = (await getDocFromCache(restartedDocument)).data();
+    expect(reopenedData).toMatchObject({
+      operation: { type: "reopenTask", taskId },
       tasks: { [taskId]: { title: "Buy bread", completed: false, date: "2026-10-05" } },
     });
 
@@ -88,13 +106,14 @@ it("retains offline task creation, title and date editing, completion, and reope
     await disableNetwork(firestore);
     const finalDocument = doc(firestore, "users", "offline-user");
     const final = await getDocFromCache(finalDocument);
-    expect(final.data()).toEqual({ tasks: { [taskId]: { title: "Buy bread", completed: false, date: "2026-10-05" } } });
+    expect(final.data()).toEqual(reopenedData);
     expect(final.metadata.hasPendingWrites).toBe(true);
 
     await enableNetwork(firestore);
     await waitForPendingWrites(firestore);
     expect((await getDocFromServer(finalDocument)).data()).toEqual(final.data());
   } finally {
+    clock.mockRestore();
     await terminate(firestore);
     await deleteApp(app);
     vi.unstubAllGlobals();
