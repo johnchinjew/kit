@@ -5,12 +5,14 @@ import {
   completeTask,
   reopenTask,
   setTaskDate,
+  setTaskDetails,
   setTaskTitle,
   type Task
 } from "./userData";
 
 type TaskDraft = {
   title: string;
+  details: string;
   date: string;
 };
 
@@ -33,6 +35,11 @@ export default function Editor(props: {
     }));
   };
 
+  const onChangeDetails: JSX.EventHandler<HTMLTextAreaElement, InputEvent> = (event) => {
+    if (props.task.completedAt !== null) return;
+    setDraft((current) => ({ ...current, details: event.currentTarget.value }));
+  };
+
   const onChangeDate: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
     if (props.task.completedAt !== null) return;
     setDraft((current) => ({
@@ -44,12 +51,14 @@ export default function Editor(props: {
   const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
     if (!saveDate()) return;
     saveTitle();
+    saveDetails();
     props.onBack();
   };
 
   const onClickComplete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
     if (!saveDate()) return;
     saveTitle();
+    saveDetails();
     void completeTask(props.session.user.id, props.taskId).catch(() => {
       props.showNotice("Could not complete task. Try again later.");
     });
@@ -66,6 +75,14 @@ export default function Editor(props: {
   function saveTitle() {
     if (props.task.completedAt === null && draft().title !== initialTask.title) {
       void setTaskTitle(props.session.user.id, props.taskId, draft().title).catch(() => {
+        props.showNotice("Could not save task. Try again later.");
+      });
+    }
+  }
+
+  function saveDetails() {
+    if (props.task.completedAt === null && draft().details !== initialTask.details) {
+      void setTaskDetails(props.session.user.id, props.taskId, draft().details).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
@@ -103,6 +120,12 @@ export default function Editor(props: {
         value={draft().title}
         readOnly={props.task.completedAt !== null}
         onInput={onChangeTitle}
+      />
+      <textarea
+        name="details"
+        value={draft().details}
+        readOnly={props.task.completedAt !== null}
+        onInput={onChangeDetails}
       />
       <input
         name="date"

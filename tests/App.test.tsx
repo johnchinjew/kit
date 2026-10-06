@@ -34,11 +34,11 @@ it("orders completed tasks by completion instant and displays completion dates",
   const newest = new Timestamp(newer.seconds, newer.nanoseconds + 1);
   vi.mocked(subscribeUserData).mockImplementation((_userId, onUserData) => {
     onUserData({ tasks: {
-      older: { title: "Older", date: decodeTaskDate("2026-10-08"), completedAt: older },
-      newer: { title: "Newer", date: decodeTaskDate("2026-10-07"), completedAt: newer },
-      newest: { title: "Newest", date: decodeTaskDate("2026-10-09"), completedAt: newest },
-      later: { title: "Later", completedAt: null, date: decodeTaskDate("2026-10-06") },
-      earlier: { title: "Earlier", completedAt: null, date: decodeTaskDate("2026-10-04") },
+      older: { title: "Older", details: "", date: decodeTaskDate("2026-10-08"), completedAt: older },
+      newer: { title: "Newer", details: "", date: decodeTaskDate("2026-10-07"), completedAt: newer },
+      newest: { title: "Newest", details: "", date: decodeTaskDate("2026-10-09"), completedAt: newest },
+      later: { title: "Later", details: "", completedAt: null, date: decodeTaskDate("2026-10-06") },
+      earlier: { title: "Earlier", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") },
     } });
     return vi.fn();
   });

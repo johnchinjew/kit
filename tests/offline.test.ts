@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { expect, it, vi } from "vitest";
-import { completeTask, createTask, reopenTask, setTaskDate, setTaskTitle } from "../src/userData";
+import { completeTask, createTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -25,7 +25,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   return { ...firestore, initializeFirestore: vi.fn(firestore.initializeFirestore) };
 });
 
-it("retains offline task creation, title and date editing, completion, and reopening across restarts, then syncs", async () => {
+it("retains offline task creation, title, details, and date editing, completion, and reopening across restarts, then syncs", async () => {
   const storage = new Map<string, string>();
   vi.stubGlobal("window", {
     location: { hostname: "localhost" },
@@ -62,8 +62,8 @@ it("retains offline task creation, title and date editing, completion, and reope
     const created = await getDocFromCache(userDocument);
     expect(created.data()).toEqual({
       operation: { type: "createTask", taskId }, tasks: { [taskId]: {
-        title: "", completed: false, date: taskDateToday(),
-        titleEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
+        title: "", details: "", completed: false, date: taskDateToday(),
+        titleEditedAt: expect.any(Timestamp), detailsEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
         completedEditedAt: expect.any(Timestamp),
       } },
     });
@@ -72,11 +72,13 @@ it("retains offline task creation, title and date editing, completion, and reope
     clock.mockReturnValue(Timestamp.fromMillis(startTime + 2_000));
     void setTaskDate("offline-user", taskId, decodeTaskDate("2026-10-05")).catch(() => {});
     clock.mockReturnValue(Timestamp.fromMillis(startTime + 3_000));
+    void setTaskDetails("offline-user", taskId, "Whole grain\nTwo loaves").catch(() => {});
     void completeTask("offline-user", taskId).catch(() => {});
     const completedData = (await getDocFromCache(userDocument)).data();
     expect(completedData).toMatchObject({
       operation: { type: "completeTask", taskId },
-      tasks: { [taskId]: { title: "Buy bread", completed: true, date: "2026-10-05" } },
+      tasks: { [taskId]: { title: "Buy bread", details: "Whole grain\nTwo loaves", detailsEditedAt: Timestamp.fromMillis(startTime + 3_000),
+        completed: true, date: "2026-10-05" } },
     });
 
     await terminate(firestore);
@@ -95,7 +97,7 @@ it("retains offline task creation, title and date editing, completion, and reope
     const reopenedData = (await getDocFromCache(restartedDocument)).data();
     expect(reopenedData).toMatchObject({
       operation: { type: "reopenTask", taskId },
-      tasks: { [taskId]: { title: "Buy bread", completed: false, date: "2026-10-05" } },
+      tasks: { [taskId]: { title: "Buy bread", details: "Whole grain\nTwo loaves", completed: false, date: "2026-10-05" } },
     });
 
     await terminate(firestore);

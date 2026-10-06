@@ -9,8 +9,8 @@ let environment: RulesTestEnvironment;
 const oldTime = Timestamp.fromMillis(Date.now() - 10_000);
 const editTime = Timestamp.fromMillis(Date.now() - 5_000);
 const task = {
-  title: "Buy milk", completed: false, date: "2024-10-04",
-  titleEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
+  title: "Buy milk", details: "", completed: false, date: "2024-10-04",
+  titleEditedAt: oldTime, detailsEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
   futureField: 42,
 };
 
@@ -50,8 +50,8 @@ describe("Firestore security rules", () => {
     for (const db of [alice, anonymous]) {
       await assertFails(setDoc(doc(db, "users/bob"), {
         operation: { type: "createTask", taskId }, tasks: { [taskId]: {
-          title: "", completed: false, date: "2024-10-04",
-          titleEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
+          title: "", details: "", completed: false, date: "2024-10-04",
+          titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
         } },
       }));
     }
@@ -61,8 +61,8 @@ describe("Firestore security rules", () => {
     const db = environment.authenticatedContext(userId).firestore();
     const reference = doc(db, "users", userId);
     const taskId = crypto.randomUUID();
-    const created = { title: "", completed: false, date: "2024-10-04",
-      titleEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime };
+    const created = { title: "", details: "", completed: false, date: "2024-10-04",
+      titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime };
     await assertSucceeds(setDoc(reference, {
       operation: { type: "createTask", taskId }, tasks: { [taskId]: created },
     }, { merge: true }));
@@ -80,8 +80,8 @@ describe("Firestore security rules", () => {
     const taskId = crypto.randomUUID();
     await assertSucceeds(setDoc(reference, {
       operation: { type: "createTask", taskId }, tasks: { [taskId]: {
-        title: "", completed: false, date: "2024-10-04",
-        titleEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
+        title: "", details: "", completed: false, date: "2024-10-04",
+        titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
       } },
     }, { merge: true }));
     expect((await getDoc(reference)).data()!.futureField).toBe(true);
@@ -89,6 +89,7 @@ describe("Firestore security rules", () => {
 
   it.each([
     ["setTaskTitle", { title: "Buy bread", titleEditedAt: editTime }],
+    ["setTaskDetails", { details: "Two loaves", detailsEditedAt: editTime }],
     ["setTaskDate", { date: "2024-10-05", dateEditedAt: editTime }],
     ["completeTask", { completed: true, completedEditedAt: editTime }],
     ["reopenTask", { completed: false, completedEditedAt: editTime }],
@@ -107,10 +108,12 @@ describe("Firestore security rules", () => {
     }, { merge: true }));
   });
 
-  it("merges concurrent title and date edits while preserving unknown fields", async () => {
+  it("merges concurrent title, details, and date edits while preserving unknown fields", async () => {
     const first = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
     const second = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
     await Promise.all([
+      assertSucceeds(setDoc(second, { operation: { type: "setTaskDetails", taskId: "task.with.dots" },
+        tasks: { "task.with.dots": { details: "Two loaves", detailsEditedAt: editTime } } }, { merge: true })),
       assertSucceeds(setDoc(first, { operation: { type: "setTaskTitle", taskId: "task.with.dots" },
         tasks: { "task.with.dots": { title: "Bread", titleEditedAt: editTime } } }, { merge: true })),
       assertSucceeds(setDoc(second, { operation: { type: "setTaskDate", taskId: "task.with.dots" },
@@ -118,10 +121,11 @@ describe("Firestore security rules", () => {
     ]);
     expect((await getDoc(first)).data()).toEqual({
       futureField: true,
-      operation: { type: expect.stringMatching(/^setTask(Title|Date)$/), taskId: "task.with.dots" },
+      operation: { type: expect.stringMatching(/^setTask(Title|Details|Date)$/), taskId: "task.with.dots" },
       tasks: { other: task, "task.with.dots": {
-        ...task, title: "Bread", date: "2024-10-06",
+        ...task, title: "Bread", details: "Two loaves", date: "2024-10-06",
         titleEditedAt: editTime,
+        detailsEditedAt: editTime,
         dateEditedAt: editTime,
       } },
     });
@@ -133,8 +137,8 @@ describe("Firestore security rules", () => {
       const db = environment.authenticatedContext("alice").firestore();
       await assertSucceeds(setDoc(doc(db, "users/alice"), {
         operation: { type: "createTask", taskId }, tasks: { [taskId]: {
-          title: "", completed: false, date: "2024-10-04",
-          titleEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
+          title: "", details: "", completed: false, date: "2024-10-04",
+          titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
         } },
       }, { merge: true }));
     }));
@@ -145,6 +149,7 @@ describe("Firestore security rules", () => {
 
   it.each([
     ["setTaskTitle", "title", "Bread", "titleEditedAt"],
+    ["setTaskDetails", "details", "Two loaves", "detailsEditedAt"],
     ["setTaskDate", "date", "2024-10-06", "dateEditedAt"],
     ["completeTask", "completed", true, "completedEditedAt"],
     ["reopenTask", "completed", false, "completedEditedAt"],
@@ -167,7 +172,7 @@ describe("Firestore security rules", () => {
     await environment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), "users/alice"), {
         tasks: { legacy: {
-          title: "Milk", completed: false, date: "2024-10-04", futureField: 42,
+          title: "Milk", details: "", completed: false, date: "2024-10-04", futureField: 42,
         } },
       });
     });
@@ -289,8 +294,8 @@ describe("Firestore security rules", () => {
     await assertSucceeds(setDoc(reference, {
       operation: { type: "createTask", taskId },
       tasks: { [taskId]: {
-        title: "", completed: false, date,
-        titleEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
+        title: "", details: "", completed: false, date,
+        titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
       } },
     }, { merge: true }));
     await assertSucceeds(setDoc(reference, {
@@ -304,7 +309,7 @@ describe("Firestore security rules", () => {
     const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
     await assertSucceeds(setDoc(reference, { operation: { type: "createTask", taskId }, tasks: { [taskId]: {
       title: 42, completed: "invalid", date: null, extra: true,
-      titleEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
+      titleEditedAt: oldTime, detailsEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
     } } }, { merge: true }));
     await assertSucceeds(setDoc(reference, { operation: { type: "setTaskTitle", taskId },
       tasks: { [taskId]: { title: false, titleEditedAt: editTime } } }, { merge: true }));
@@ -317,6 +322,7 @@ describe("Firestore security rules", () => {
 
   it.each([
     { titleEditedAt: "bad" }, { titleEditedAt: deleteField() },
+    { detailsEditedAt: "bad" }, { detailsEditedAt: deleteField() },
     { dateEditedAt: 42 }, { dateEditedAt: deleteField() },
     { completedEditedAt: null }, { completedEditedAt: deleteField() },
     { titleEditedAt: Timestamp.fromMillis(Date.now() + 600_000),
@@ -326,8 +332,8 @@ describe("Firestore security rules", () => {
     const taskId = crypto.randomUUID();
     const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
     await assertFails(setDoc(reference, { operation: { type: "createTask", taskId }, tasks: { [taskId]: {
-      title: "", completed: false, date: "2024-10-04",
-      titleEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime, ...patch,
+      title: "", details: "", completed: false, date: "2024-10-04",
+      titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime, ...patch,
     } } }, { merge: true }));
   });
 });

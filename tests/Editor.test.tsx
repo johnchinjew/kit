@@ -5,11 +5,12 @@ import { render } from "solid-js/web";
 import { afterEach, expect, it, vi } from "vitest";
 import { decodeTaskDate } from "../src/taskDate";
 import Editor from "../src/Editor";
-import { completeTask, reopenTask, setTaskDate, setTaskTitle, type Task } from "../src/userData";
+import { completeTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, type Task } from "../src/userData";
 
 vi.mock("../src/userData", () => ({
   completeTask: vi.fn().mockResolvedValue(undefined),
   reopenTask: vi.fn().mockResolvedValue(undefined),
+  setTaskDetails: vi.fn().mockResolvedValue(undefined),
   setTaskDate: vi.fn().mockResolvedValue(undefined),
   setTaskTitle: vi.fn().mockResolvedValue(undefined),
 }));
@@ -28,7 +29,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
+      task={{ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={onBack}
@@ -43,10 +44,15 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   expect(date.readOnly).toBe(true);
   date.value = "2026-10-05";
   date.dispatchEvent(new Event("input", { bubbles: true }));
+  const details = document.querySelector("textarea")!;
+  expect(details.readOnly).toBe(true);
+  details.value = "Changed details";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
   const buttons = [...document.querySelectorAll("button")];
   expect(buttons.map((button) => button.textContent)).toEqual(["Back", "Reopen"]);
   buttons.find((button) => button.textContent === action)!.click();
 
+  expect(setTaskDetails).not.toHaveBeenCalled();
   expect(setTaskTitle).not.toHaveBeenCalled();
   expect(setTaskDate).not.toHaveBeenCalled();
   expect(completeTask).not.toHaveBeenCalled();
@@ -62,7 +68,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
@@ -74,10 +80,14 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
   const date = document.querySelector<HTMLInputElement>('input[name="date"]')!;
   date.value = "2026-10-05";
   date.dispatchEvent(new Event("input", { bubbles: true }));
+  const details = document.querySelector("textarea")!;
+  details.value = "Whole grain\nTwo loaves";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
   input.value = "Buy eggs";
   input.dispatchEvent(new Event("input", { bubbles: true }));
   [...document.querySelectorAll("button")].find((button) => button.textContent === action)!.click();
 
+  expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Whole grain\nTwo loaves");
   expect(setTaskDate).toHaveBeenCalledExactlyOnceWith("alice", "first", "2026-10-05");
   expect(setTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy eggs");
   if (action === "Complete") {
@@ -88,7 +98,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
 });
 
 it("does not save a draft if the task is completed on another device", () => {
-  const [task, setTask] = createSignal<Task>({ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") });
+  const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
     <Editor
       taskId="first"
@@ -103,13 +113,18 @@ it("does not save a draft if the task is completed on another device", () => {
   const date = document.querySelector<HTMLInputElement>('input[name="date"]')!;
   date.value = "2026-10-05";
   date.dispatchEvent(new Event("input", { bubbles: true }));
+  const details = document.querySelector("textarea")!;
+  details.value = "Whole grain\nTwo loaves";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
   input.value = "Buy eggs";
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  setTask({ title: "Buy bread", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() });
+  setTask({ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() });
   expect(input.readOnly).toBe(true);
   expect(date.readOnly).toBe(true);
+  expect(details.readOnly).toBe(true);
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
 
+  expect(setTaskDetails).not.toHaveBeenCalled();
   expect(setTaskTitle).not.toHaveBeenCalled();
   expect(setTaskDate).not.toHaveBeenCalled();
 });
@@ -120,7 +135,7 @@ it("prevents saving a cleared task date", () => {
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -145,7 +160,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -158,6 +173,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
   [...document.querySelectorAll("button")].find((button) => button.textContent === action)!.click();
 
   expect(setTaskDate).not.toHaveBeenCalled();
+  expect(setTaskDetails).not.toHaveBeenCalled();
   expect(setTaskTitle).not.toHaveBeenCalled();
   expect(completeTask).not.toHaveBeenCalled();
   expect(onBack).not.toHaveBeenCalled();
@@ -170,8 +186,8 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
   expect(onBack).toHaveBeenCalledOnce();
 });
 
-it.each(["title", "date"] as const)("saves only the edited %s when the other field changes remotely", (field) => {
-  const [task, setTask] = createSignal<Task>({ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") });
+it.each(["title", "date", "details"] as const)("saves only the edited %s when the other field changes remotely", (field) => {
+  const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
     <Editor
       taskId="first"
@@ -182,19 +198,42 @@ it.each(["title", "date"] as const)("saves only the edited %s when the other fie
     />
   ), document.body);
 
-  const input = document.querySelector<HTMLInputElement>(`input[name="${field}"]`)!;
-  input.value = field === "title" ? "Buy eggs" : "2026-10-05";
+  const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${field}"]`)!;
+  input.value = field === "title" ? "Buy eggs" : field === "date" ? "2026-10-05" : "Two loaves";
   input.dispatchEvent(new Event("input", { bubbles: true }));
   setTask(field === "title"
-    ? { title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-06") }
-    : { title: "Buy milk", completedAt: null, date: decodeTaskDate("2026-10-04") });
+    ? { title: "Buy bread", details: "Remote details", completedAt: null, date: decodeTaskDate("2026-10-06") }
+    : { title: "Buy milk", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
 
   if (field === "title") {
     expect(setTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy eggs");
     expect(setTaskDate).not.toHaveBeenCalled();
-  } else {
+  } else if (field === "date") {
     expect(setTaskDate).toHaveBeenCalledExactlyOnceWith("alice", "first", "2026-10-05");
     expect(setTaskTitle).not.toHaveBeenCalled();
+  } else {
+    expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Two loaves");
+    expect(setTaskDate).not.toHaveBeenCalled();
+    expect(setTaskTitle).not.toHaveBeenCalled();
   }
+  if (field !== "details") expect(setTaskDetails).not.toHaveBeenCalled();
+});
+
+it("can clear details and reports a failed save", async () => {
+  const showNotice = vi.fn();
+  vi.mocked(setTaskDetails).mockRejectedValueOnce(new Error("Offline"));
+  dispose = render(() => (
+    <Editor taskId="first"
+      task={{ title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+      session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
+      showNotice={showNotice} onBack={vi.fn()} />
+  ), document.body);
+  const details = document.querySelector("textarea")!;
+  details.value = "";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
+  document.querySelector("button")!.click();
+  expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "");
+  await Promise.resolve();
+  expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not save task. Try again later.");
 });

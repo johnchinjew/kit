@@ -9,7 +9,7 @@ import { decodeTaskDate, taskDateToday, type TaskDate } from "./taskDate";
 
 export type UserData = { tasks: Record<string, Task>; };
 
-export type Task = { title: string; date: TaskDate; completedAt: Timestamp | null; };
+export type Task = { title: string; details: string; date: TaskDate; completedAt: Timestamp | null; };
 
 export function emptyUserData(): UserData {
   return { tasks: {} };
@@ -22,9 +22,11 @@ export async function createTask(userId: string, taskId: string): Promise<void> 
     tasks: {
       [taskId]: {
         title: "",
+        details: "",
         completed: false,
         date: taskDateToday(),
         titleEditedAt: editedAt,
+        detailsEditedAt: editedAt,
         completedEditedAt: editedAt,
         dateEditedAt: editedAt,
       }
@@ -36,6 +38,13 @@ export async function setTaskTitle(userId: string, taskId: string, title: string
   await setDoc(doc(getFirestore(), "users", userId), {
     operation: { type: "setTaskTitle", taskId },
     tasks: { [taskId]: { title, titleEditedAt: Timestamp.now() } },
+  }, { merge: true });
+}
+
+export async function setTaskDetails(userId: string, taskId: string, details: string): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    operation: { type: "setTaskDetails", taskId },
+    tasks: { [taskId]: { details, detailsEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
@@ -92,6 +101,7 @@ function decodeTask(id: string, data: unknown): Task {
   if (
     !isRecord(data)
     || typeof data.title !== "string"
+    || typeof data.details !== "string"
     || typeof data.completed !== "boolean"
     || typeof data.date !== "string"
   ) {
@@ -107,9 +117,9 @@ function decodeTask(id: string, data: unknown): Task {
     if (!(data.completedEditedAt instanceof Timestamp)) {
       throw new Error(`Invalid task ${id}: invalid completion timestamp`);
     }
-    return { title: data.title, date, completedAt: data.completedEditedAt };
+    return { title: data.title, details: data.details, date, completedAt: data.completedEditedAt };
   }
-  return { title: data.title, date, completedAt: null };
+  return { title: data.title, details: data.details, date, completedAt: null };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
