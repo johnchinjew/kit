@@ -1,6 +1,15 @@
 declare const brand: unique symbol;
 export type TaskDate = string & { readonly [brand]: true; };
 
+export function formatDate(date: TaskDate, locales?: string | string[]): string {
+  return new Intl.DateTimeFormat(locales, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
+}
+
 export function today(): TaskDate {
   const now = new Date();
   return decodeDate(`${String(now.getFullYear()).padStart(4, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);

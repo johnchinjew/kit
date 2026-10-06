@@ -1,10 +1,19 @@
 import { afterEach, expect, expectTypeOf, it, vi } from "vitest";
-import { decodeDate, oneYearFromToday, today, type TaskDate } from "../src/date";
+import { decodeDate, formatDate, oneYearFromToday, today, type TaskDate } from "../src/date";
 import { type Task, setTaskDate } from "../src/userData";
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+});
+
+it.each([
+  ["en-US", "10/05/2026"],
+  ["en-GB", "05/10/2026"],
+  ["de-DE", "05.10.2026"],
+])("formats dates for %s without shifting the calendar day", (locale, expected) => {
+  vi.stubEnv("TZ", "America/Los_Angeles");
+  expect(formatDate(decodeDate("2026-10-05"), locale)).toBe(expected);
 });
 
 it("uses the local calendar date near a UTC day boundary", () => {
