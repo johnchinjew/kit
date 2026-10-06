@@ -7,16 +7,6 @@ matching the commit conventions of the project.
 
 Don't proactivley commit changes or amend existing commits unless explicitly requested.
 
-## Elm
-
-Use import `exposing` for types only, such as `import Html exposing (Html)`. Call functions through their qualified
-module names, such as `Html.div`. If importing a multi-segment module prefer to alias the last segment, such as
-`import Html.Attributes as Attributes`.
-
-Prefer named ports per operation/event. Consolidate ports only to share behavior, not reduce port count.
-Instead of managing per-operation IDs, prefer one pending operation per port. This means ignoring new requests in
-`update` until the pending request finishes and all response handling is applied.
-
 ## Tests
 
 Test tricky domain logic such as date and recurrence behavior. Test tricky persistence logic such as decoding and
