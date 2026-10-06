@@ -104,9 +104,11 @@ function AppSignedIn(props: {
             )}
           </For>
         </ul>
-        <button type="button" onClick={addTask}>
-          Add
-        </button>
+        <Show when={listMode() === "schedule"}>
+          <button type="button" onClick={addTask}>
+            Add
+          </button>
+        </Show>
       </Match>
       <Match when={selectedTaskId()}>
         {(taskId) => (
