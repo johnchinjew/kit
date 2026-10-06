@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { Timestamp } from "firebase/firestore";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { afterEach, expect, it, vi } from "vitest";
@@ -27,7 +28,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completed: true, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={onBack}
@@ -61,7 +62,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completed: false, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
@@ -87,7 +88,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
 });
 
 it("does not save a draft if the task is completed on another device", () => {
-  const [task, setTask] = createSignal<Task>({ title: "Buy bread", completed: false, date: decodeTaskDate("2026-10-04") });
+  const [task, setTask] = createSignal<Task>({ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
     <Editor
       taskId="first"
@@ -104,7 +105,7 @@ it("does not save a draft if the task is completed on another device", () => {
   date.dispatchEvent(new Event("input", { bubbles: true }));
   input.value = "Buy eggs";
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  setTask({ title: "Buy bread", completed: true, date: decodeTaskDate("2026-10-04") });
+  setTask({ title: "Buy bread", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() });
   expect(input.readOnly).toBe(true);
   expect(date.readOnly).toBe(true);
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
@@ -119,7 +120,7 @@ it("prevents saving a cleared task date", () => {
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completed: false, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -144,7 +145,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", completed: false, date: decodeTaskDate("2026-10-04") }}
+      task={{ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "signed-in", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -170,7 +171,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
 });
 
 it.each(["title", "date"] as const)("saves only the edited %s when the other field changes remotely", (field) => {
-  const [task, setTask] = createSignal<Task>({ title: "Buy bread", completed: false, date: decodeTaskDate("2026-10-04") });
+  const [task, setTask] = createSignal<Task>({ title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
     <Editor
       taskId="first"
@@ -185,8 +186,8 @@ it.each(["title", "date"] as const)("saves only the edited %s when the other fie
   input.value = field === "title" ? "Buy eggs" : "2026-10-05";
   input.dispatchEvent(new Event("input", { bubbles: true }));
   setTask(field === "title"
-    ? { title: "Buy bread", completed: false, date: decodeTaskDate("2026-10-06") }
-    : { title: "Buy milk", completed: false, date: decodeTaskDate("2026-10-04") });
+    ? { title: "Buy bread", completedAt: null, date: decodeTaskDate("2026-10-06") }
+    : { title: "Buy milk", completedAt: null, date: decodeTaskDate("2026-10-04") });
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
 
   if (field === "title") {

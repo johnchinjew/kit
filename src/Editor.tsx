@@ -11,7 +11,6 @@ import {
 
 type TaskDraft = {
   title: string;
-  completed: boolean;
   date: string;
 };
 
@@ -27,7 +26,7 @@ export default function Editor(props: {
   const [draft, setDraft] = createSignal<TaskDraft>(initialTask);
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.task.completed) return;
+    if (props.task.completedAt !== null) return;
     setDraft((current) => ({
       ...current,
       title: event.currentTarget.value
@@ -35,7 +34,7 @@ export default function Editor(props: {
   };
 
   const onChangeDate: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.task.completed) return;
+    if (props.task.completedAt !== null) return;
     setDraft((current) => ({
       ...current,
       date: event.currentTarget.value
@@ -65,7 +64,7 @@ export default function Editor(props: {
   };
 
   function saveTitle() {
-    if (!props.task.completed && draft().title !== initialTask.title) {
+    if (props.task.completedAt === null && draft().title !== initialTask.title) {
       void setTaskTitle(props.session.user.id, props.taskId, draft().title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
@@ -74,7 +73,7 @@ export default function Editor(props: {
 
   function saveDate() {
     const date = draft().date;
-    if (!props.task.completed && date !== initialTask.date) {
+    if (props.task.completedAt === null && date !== initialTask.date) {
       let validatedDate: TaskDate;
       try {
         validatedDate = decodeTaskDate(date);
@@ -102,7 +101,7 @@ export default function Editor(props: {
         name="title"
         type="text"
         value={draft().title}
-        readOnly={props.task.completed}
+        readOnly={props.task.completedAt !== null}
         onInput={onChangeTitle}
       />
       <input
@@ -110,15 +109,15 @@ export default function Editor(props: {
         type="date"
         max={taskDateOneYearFromToday()}
         value={draft().date}
-        readOnly={props.task.completed}
+        readOnly={props.task.completedAt !== null}
         onInput={onChangeDate}
       />
-      <Show when={!props.task.completed}>
+      <Show when={props.task.completedAt === null}>
         <button type="button" onClick={onClickComplete}>
           Complete
         </button>
       </Show>
-      <Show when={props.task.completed}>
+      <Show when={props.task.completedAt !== null}>
         <button type="button" onClick={onClickReopen}>
           Reopen
         </button>

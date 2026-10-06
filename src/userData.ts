@@ -9,7 +9,7 @@ import { decodeTaskDate, taskDateToday, type TaskDate } from "./taskDate";
 
 export type UserData = { tasks: Record<string, Task>; };
 
-export type Task = { title: string; completed: boolean; date: TaskDate; };
+export type Task = { title: string; date: TaskDate; completedAt: Timestamp | null; };
 
 export function emptyUserData(): UserData {
   return { tasks: {} };
@@ -103,7 +103,13 @@ function decodeTask(id: string, data: unknown): Task {
   } catch {
     throw new Error(`Invalid task ${id}: invalid date`);
   }
-  return { title: data.title, completed: data.completed, date };
+  if (data.completed) {
+    if (!(data.completedEditedAt instanceof Timestamp)) {
+      throw new Error(`Invalid task ${id}: invalid completion timestamp`);
+    }
+    return { title: data.title, date, completedAt: data.completedEditedAt };
+  }
+  return { title: data.title, date, completedAt: null };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

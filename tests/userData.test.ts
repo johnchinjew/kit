@@ -266,18 +266,19 @@ describe("User data: subscription", () => {
     } as unknown as DocumentSnapshot);
     expect(onUserData).toHaveBeenLastCalledWith({
       tasks: {
-        first: { title: "Buy milk", completed: false, date: "2026-10-04" },
-        second: { title: "Walk dog", completed: false, date: "2026-10-04" },
+        first: { title: "Buy milk", completedAt: null, date: "2026-10-04" },
+        second: { title: "Walk dog", completedAt: null, date: "2026-10-04" },
       }
     });
 
     receive({
       data: () => ({ tasks: { second: { title: "Walk dog again", completed: false, date: "2026-10-04" } } }),
     } as unknown as DocumentSnapshot);
-    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", completed: false, date: "2026-10-04" } } });
+    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", completedAt: null, date: "2026-10-04" } } });
   });
 
   it("reads incomplete and completed tasks", () => {
+    const completedAt = Timestamp.fromMillis(1000);
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
@@ -287,15 +288,69 @@ describe("User data: subscription", () => {
     receive({
       data: () => ({ tasks: {
         incomplete: { title: "Walk dog", completed: false, date: "2026-10-04" },
-        completed: { title: "Buy bread", completed: true, date: "2026-10-04" },
+        completed: { title: "Buy bread", completed: true, date: "2026-10-04", completedEditedAt: completedAt },
       } }),
     } as unknown as DocumentSnapshot);
 
     expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {
-      incomplete: { title: "Walk dog", completed: false, date: "2026-10-04" },
-      completed: { title: "Buy bread", completed: true, date: "2026-10-04" },
+      incomplete: { title: "Walk dog", completedAt: null, date: "2026-10-04" },
+      completed: { title: "Buy bread", date: "2026-10-04", completedAt },
     } });
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("reads completion timestamps and follows reopening and completion snapshots", () => {
+    const onUserData = vi.fn();
+    const onError = vi.fn();
+    subscribeUserData("alice", onUserData, onError);
+    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      (snapshot: DocumentSnapshot) => void;
+
+    for (const [completed, milliseconds] of [[true, 1000], [false, 2000], [true, 3000]] as const) {
+      const task = {
+        title: "Buy bread", completed, date: "2026-10-04",
+        completedEditedAt: Timestamp.fromMillis(milliseconds),
+      };
+      receive({ data: () => ({ tasks: { first: task } }) } as unknown as DocumentSnapshot);
+      expect(onUserData).toHaveBeenLastCalledWith({ tasks: { first: {
+        title: "Buy bread", date: "2026-10-04",
+        completedAt: completed ? Timestamp.fromMillis(milliseconds) : null,
+      } } });
+    }
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it.each([null, undefined, 42, "2026-10-05", { seconds: 1000, nanoseconds: 0 }])(
+    "rejects an invalid completion timestamp: %j",
+    (completedEditedAt) => {
+      const onUserData = vi.fn();
+      const onError = vi.fn();
+      subscribeUserData("alice", onUserData, onError);
+      const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+        (snapshot: DocumentSnapshot) => void;
+
+      receive({ data: () => ({ tasks: { first: {
+        title: "Buy bread", completed: true, date: "2026-10-04", completedEditedAt,
+      } } }) } as unknown as DocumentSnapshot);
+
+      expect(onUserData).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledExactlyOnceWith(new Error("Invalid task first: invalid completion timestamp"));
+    },
+  );
+
+  it("rejects a completed task without a completion timestamp", () => {
+    const onUserData = vi.fn();
+    const onError = vi.fn();
+    subscribeUserData("alice", onUserData, onError);
+    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      (snapshot: DocumentSnapshot) => void;
+
+    receive({ data: () => ({ tasks: { first: {
+      title: "Buy bread", completed: true, date: "2026-10-04",
+    } } }) } as unknown as DocumentSnapshot);
+
+    expect(onUserData).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledExactlyOnceWith(new Error("Invalid task first: invalid completion timestamp"));
   });
 
   it.each([undefined, {}, { tasks: {} }, { futureField: true }])(
@@ -357,7 +412,9 @@ describe("User data: subscription", () => {
         })
       } as unknown as DocumentSnapshot);
 
-      expect(onUserData).toHaveBeenCalledExactlyOnceWith(valid);
+      expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {
+        valid: { title: "Buy milk", date: "2026-10-04", completedAt: null },
+      } });
       expect(onError).toHaveBeenCalledExactlyOnceWith(new Error(
         "Invalid task malformed",
       ));

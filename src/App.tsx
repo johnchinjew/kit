@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import Editor from "./Editor";
 import { formatTaskDate } from "./taskDate";
+import { formatDate } from "./date";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn, type SigningOut } from "./session";
 import { createTask, emptyUserData, subscribeUserData, type UserData } from "./userData";
@@ -86,13 +87,17 @@ function AppSignedIn(props: {
         <ul>
           <For each={Object.entries(userData().tasks).filter(([, task]) => {
             switch (listMode()) {
-              case "schedule": return !task.completed;
-              case "completed": return task.completed;
+              case "schedule": return task.completedAt === null;
+              case "completed": return task.completedAt !== null;
             }
           }).sort(([, left], [, right]) => {
             switch (listMode()) {
               case "schedule": return left.date.localeCompare(right.date);
-              case "completed": return 0;
+              case "completed": {
+                if (left.completedAt === null || right.completedAt === null) return 0;
+                return right.completedAt.seconds - left.completedAt.seconds
+                  || right.completedAt.nanoseconds - left.completedAt.nanoseconds;
+              }
             }
           })}>
             {([taskId, task]) => (
@@ -100,7 +105,15 @@ function AppSignedIn(props: {
                 <button type="button" onClick={() => setSelectedTaskId(taskId)}>
                   {task.title}
                 </button>
-                <time dateTime={task.date}>{formatTaskDate(task.date)}</time>
+                <Show when={task.completedAt} fallback={
+                  <time dateTime={task.date}>{formatTaskDate(task.date)}</time>
+                }>
+                  {(completedAt) => (
+                    <time dateTime={completedAt().toDate().toISOString()}>
+                      {formatDate(completedAt().toDate())}
+                    </time>
+                  )}
+                </Show>
               </li>
             )}
           </For>
