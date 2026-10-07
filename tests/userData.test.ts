@@ -36,7 +36,7 @@ describe("User data: task creation", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      operation: { type: "createTask", taskId: "first" },
+      operation: { type: "CreateTask", taskId: "first" },
       tasks: { first: {
         title: "", details: "", completed: false, date: taskDateToday(),
         titleEditedAt: expect.any(Timestamp),
@@ -103,7 +103,7 @@ describe("User data: task title editing", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      operation: { type: "setTaskTitle", taskId: "task.with.dots" },
+      operation: { type: "SetTaskTitle", taskId: "task.with.dots" },
       tasks: { "task.with.dots": {
         title: "Buy bread",
         titleEditedAt: expect.any(Timestamp),
@@ -136,7 +136,7 @@ describe("User data: task details editing", () => {
     for (const details of ["Whole grain\nTwo loaves", ""]) {
       await setTaskDetails("alice", "task.with.dots", details);
       expect(setDoc).toHaveBeenLastCalledWith(reference, {
-        operation: { type: "setTaskDetails", taskId: "task.with.dots" },
+        operation: { type: "SetTaskDetails", taskId: "task.with.dots" },
         tasks: { "task.with.dots": { details, detailsEditedAt: expect.any(Timestamp) } },
       }, { merge: true });
     }
@@ -162,7 +162,7 @@ describe("User data: task date editing", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      operation: { type: "setTaskDate", taskId: "task.with.dots" },
+      operation: { type: "SetTaskDate", taskId: "task.with.dots" },
       tasks: { "task.with.dots": {
         date: "2026-10-04",
         dateEditedAt: expect.any(Timestamp),
@@ -193,7 +193,7 @@ describe("User data: task completion", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      operation: { type: "completeTask", taskId: "task.with.dots" },
+      operation: { type: "CompleteTask", taskId: "task.with.dots" },
       tasks: { "task.with.dots": {
         completed: true,
         completedEditedAt: expect.any(Timestamp),
@@ -226,7 +226,7 @@ describe("User data: task reopening", () => {
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
-      operation: { type: "reopenTask", taskId: "task.with.dots" },
+      operation: { type: "ReopenTask", taskId: "task.with.dots" },
       tasks: { "task.with.dots": {
         completed: false,
         completedEditedAt: expect.any(Timestamp),
@@ -274,7 +274,7 @@ describe("User data: subscription", () => {
 
     receive({
       data: () => ({
-        operation: { type: "setTaskTitle", taskId: "first" },
+        operation: { type: "SetTaskTitle", taskId: "first" },
         futureField: { enabled: true }, tasks: {
           first: {
             title: "Buy milk", details: "Whole milk", completed: false, date: "2026-10-04",

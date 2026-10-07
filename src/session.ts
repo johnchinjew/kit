@@ -17,14 +17,14 @@ export type Session =
   | SigningOut
   | SignedOut;
 
-export type CheckingAuth = { status: "checking-auth"; };
-export type SigningIn = { status: "signing-in"; };
-export type SignedIn = { status: "signed-in"; user: User; };
-export type SigningOut = { status: "signing-out"; user: User; };
-export type SignedOut = { status: "signed-out"; };
+export type CheckingAuth = { status: "CheckingAuth"; };
+export type SigningIn = { status: "SigningIn"; };
+export type SignedIn = { status: "SignedIn"; user: User; };
+export type SigningOut = { status: "SigningOut"; user: User; };
+export type SignedOut = { status: "SignedOut"; };
 
 export function createSession(showNotice: (message: string) => void) {
-  const [session, setSession] = createSignal<Session>({ status: "checking-auth" });
+  const [session, setSession] = createSignal<Session>({ status: "CheckingAuth" });
 
   getRedirectResult(getAuth()).catch((error) => {
     showNotice(signInErrorMessage(error));
@@ -33,38 +33,38 @@ export function createSession(showNotice: (message: string) => void) {
   const unsubscribe = onAuthStateChanged(getAuth(), (user) => {
     setSession(
       user
-        ? { status: "signed-in", user: { id: user.uid, photoUrl: user.photoURL } }
-        : { status: "signed-out" },
+        ? { status: "SignedIn", user: { id: user.uid, photoUrl: user.photoURL } }
+        : { status: "SignedOut" },
     );
   });
 
   onCleanup(unsubscribe);
 
   async function signIn() {
-    if (session().status !== "signed-out") return;
-    setSession({ status: "signing-in" });
+    if (session().status !== "SignedOut") return;
+    setSession({ status: "SigningIn" });
     try {
       const provider = new GoogleAuthProvider();
       // Prompt for account selection to support switching user
       provider.setCustomParameters({ prompt: "select_account" });
       await signInWithRedirect(getAuth(), provider);
     } catch (error) {
-      if (session().status !== "signing-in") return;
-      setSession({ status: "signed-out" });
+      if (session().status !== "SigningIn") return;
+      setSession({ status: "SignedOut" });
       showNotice(signInErrorMessage(error));
     }
   }
 
   async function signOut() {
     const current = session();
-    if (current.status !== "signed-in") return;
-    setSession({ status: "signing-out", user: current.user });
+    if (current.status !== "SignedIn") return;
+    setSession({ status: "SigningOut", user: current.user });
     try {
       await firebaseSignOut(getAuth());
     } catch (error) {
       const pending = session();
-      if (pending.status !== "signing-out") return;
-      setSession({ status: "signed-in", user: pending.user });
+      if (pending.status !== "SigningOut") return;
+      setSession({ status: "SignedIn", user: pending.user });
       showNotice(signOutErrorMessage(error));
     }
   }

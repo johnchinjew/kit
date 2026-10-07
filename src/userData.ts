@@ -18,7 +18,7 @@ export function emptyUserData(): UserData {
 export async function createTask(userId: string, taskId: string): Promise<void> {
   const editedAt = Timestamp.now();
   await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "createTask", taskId },
+    operation: { type: "CreateTask", taskId },
     tasks: {
       [taskId]: {
         title: "",
@@ -36,35 +36,35 @@ export async function createTask(userId: string, taskId: string): Promise<void> 
 
 export async function setTaskTitle(userId: string, taskId: string, title: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "setTaskTitle", taskId },
+    operation: { type: "SetTaskTitle", taskId },
     tasks: { [taskId]: { title, titleEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
 export async function setTaskDetails(userId: string, taskId: string, details: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "setTaskDetails", taskId },
+    operation: { type: "SetTaskDetails", taskId },
     tasks: { [taskId]: { details, detailsEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
 export async function completeTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "completeTask", taskId },
+    operation: { type: "CompleteTask", taskId },
     tasks: { [taskId]: { completed: true, completedEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
 export async function setTaskDate(userId: string, taskId: string, date: TaskDate): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "setTaskDate", taskId },
+    operation: { type: "SetTaskDate", taskId },
     tasks: { [taskId]: { date, dateEditedAt: Timestamp.now() } },
   }, { merge: true });
 }
 
 export async function reopenTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "reopenTask", taskId },
+    operation: { type: "ReopenTask", taskId },
     tasks: { [taskId]: { completed: false, completedEditedAt: Timestamp.now() } },
   }, { merge: true });
 }

@@ -15,12 +15,12 @@ export default function App() {
   return (
     <>
       <Switch>
-        <Match when={session().status === "checking-auth"}><p>Loading</p></Match>
-        <Match when={session().status === "signing-in"}><p>Signing in</p></Match>
-        <Match when={session().status === "signed-in" && (session() as SignedIn)}>
+        <Match when={session().status === "CheckingAuth"}><p>Loading</p></Match>
+        <Match when={session().status === "SigningIn"}><p>Signing in</p></Match>
+        <Match when={session().status === "SignedIn" && (session() as SignedIn)}>
           {(current) => <AppSignedIn session={current()} signOut={signOut} showNotice={showNotice} />}
         </Match>
-        <Match when={session().status === "signing-out" && (session() as SigningOut)}>
+        <Match when={session().status === "SigningOut" && (session() as SigningOut)}>
           {(current) => (
             <>
               <p>Signing out</p>
@@ -28,7 +28,7 @@ export default function App() {
             </>
           )}
         </Match>
-        <Match when={session().status === "signed-out"}>
+        <Match when={session().status === "SignedOut"}>
           <button type="button" onClick={signIn}>
             Sign in with Google
           </button>
@@ -39,7 +39,7 @@ export default function App() {
   );
 }
 
-type ListMode = "schedule" | "completed";
+type ListMode = "Schedule" | "Completed";
 
 function AppSignedIn(props: {
   session: SignedIn;
@@ -47,7 +47,7 @@ function AppSignedIn(props: {
   showNotice: (message: string) => void;
 }) {
   const [selectedTaskId, setSelectedTaskId] = createSignal<string>();
-  const [listMode, setListMode] = createSignal<ListMode>("schedule");
+  const [listMode, setListMode] = createSignal<ListMode>("Schedule");
   const [userData, setUserData] = createSignal<UserData>(emptyUserData());
 
   createEffect(() => {
@@ -78,22 +78,22 @@ function AppSignedIn(props: {
           value={listMode()}
           onChange={(event) => {
             const mode = event.currentTarget.value;
-            if (mode === "schedule" || mode === "completed") setListMode(mode);
+            if (mode === "Schedule" || mode === "Completed") setListMode(mode);
           }}
         >
-          <option value="schedule">Schedule</option>
-          <option value="completed">Completed</option>
+          <option value="Schedule">Schedule</option>
+          <option value="Completed">Completed</option>
         </select>
         <ul>
           <For each={Object.entries(userData().tasks).filter(([, task]) => {
             switch (listMode()) {
-              case "schedule": return task.completedAt === null;
-              case "completed": return task.completedAt !== null;
+              case "Schedule": return task.completedAt === null;
+              case "Completed": return task.completedAt !== null;
             }
           }).sort(([, left], [, right]) => {
             switch (listMode()) {
-              case "schedule": return left.date.localeCompare(right.date);
-              case "completed": {
+              case "Schedule": return left.date.localeCompare(right.date);
+              case "Completed": {
                 if (left.completedAt === null || right.completedAt === null) return 0;
                 return right.completedAt.seconds - left.completedAt.seconds
                   || right.completedAt.nanoseconds - left.completedAt.nanoseconds;
@@ -118,7 +118,7 @@ function AppSignedIn(props: {
             )}
           </For>
         </ul>
-        <Show when={listMode() === "schedule"}>
+        <Show when={listMode() === "Schedule"}>
           <button type="button" onClick={addTask}>
             Add
           </button>

@@ -61,7 +61,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     const userDocument = doc(firestore, "users", "offline-user");
     const created = await getDocFromCache(userDocument);
     expect(created.data()).toEqual({
-      operation: { type: "createTask", taskId }, tasks: { [taskId]: {
+      operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
         title: "", details: "", completed: false, date: taskDateToday(),
         titleEditedAt: expect.any(Timestamp), detailsEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
         completedEditedAt: expect.any(Timestamp),
@@ -76,7 +76,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     void completeTask("offline-user", taskId).catch(() => {});
     const completedData = (await getDocFromCache(userDocument)).data();
     expect(completedData).toMatchObject({
-      operation: { type: "completeTask", taskId },
+      operation: { type: "CompleteTask", taskId },
       tasks: { [taskId]: { title: "Buy bread", details: "Whole grain\nTwo loaves", detailsEditedAt: Timestamp.fromMillis(startTime + 3_000),
         completed: true, date: "2026-10-05" } },
     });
@@ -96,7 +96,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     void reopenTask("offline-user", taskId).catch(() => {});
     const reopenedData = (await getDocFromCache(restartedDocument)).data();
     expect(reopenedData).toMatchObject({
-      operation: { type: "reopenTask", taskId },
+      operation: { type: "ReopenTask", taskId },
       tasks: { [taskId]: { title: "Buy bread", details: "Whole grain\nTwo loaves", completed: false, date: "2026-10-05" } },
     });
 

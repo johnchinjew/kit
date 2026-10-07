@@ -9,7 +9,7 @@ import { subscribeUserData } from "../src/userData";
 
 vi.mock("../src/session", () => ({
   createSession: () => ({
-    session: () => ({ status: "signed-in", user: { id: "alice", photoUrl: null } }),
+    session: () => ({ status: "SignedIn", user: { id: "alice", photoUrl: null } }),
     signIn: vi.fn(),
     signOut: vi.fn(),
   }),
@@ -48,7 +48,7 @@ it("orders completed tasks by completion instant and displays completion dates",
   expect([...document.querySelectorAll("li time")].map((time) => time.getAttribute("datetime"))).toEqual(["2026-10-04", "2026-10-06"]);
 
   const select = document.querySelector("select")!;
-  select.value = "completed";
+  select.value = "Completed";
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
   const rows = [...document.querySelectorAll("li")];

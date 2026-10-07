@@ -63,7 +63,7 @@ describe("Session", () => {
 
   describe("auth state", () => {
     it("checks authentication until the first auth event", () => {
-      expect(controller.session()).toEqual({ status: "checking-auth" });
+      expect(controller.session()).toEqual({ status: "CheckingAuth" });
       expect(onAuthStateChanged).toHaveBeenCalledExactlyOnceWith(
         auth,
         expect.any(Function),
@@ -71,7 +71,7 @@ describe("Session", () => {
 
       changeAuth(null);
 
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
       expect(showNotice).not.toHaveBeenCalled();
     });
 
@@ -81,7 +81,7 @@ describe("Session", () => {
         changeAuth({ uid: "alice", photoURL });
 
         expect(controller.session()).toEqual({
-          status: "signed-in",
+          status: "SignedIn",
           user: { id: "alice", photoUrl: photoURL },
         });
         expect(showNotice).not.toHaveBeenCalled();
@@ -92,12 +92,12 @@ describe("Session", () => {
       changeAuth({ uid: "alice", photoURL: "first.png" });
       changeAuth({ uid: "bob", photoURL: "second.png" });
       expect(controller.session()).toEqual({
-        status: "signed-in",
+        status: "SignedIn",
         user: { id: "bob", photoUrl: "second.png" },
       });
 
       changeAuth(null);
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
     });
 
     it.each(["signIn", "signOut"] as const)(
@@ -105,7 +105,7 @@ describe("Session", () => {
       async (operation) => {
         await controller[operation]();
 
-        expect(controller.session()).toEqual({ status: "checking-auth" });
+        expect(controller.session()).toEqual({ status: "CheckingAuth" });
         expect(signInWithRedirect).not.toHaveBeenCalled();
         expect(signOut).not.toHaveBeenCalled();
         expect(showNotice).not.toHaveBeenCalled();
@@ -128,11 +128,11 @@ describe("Session", () => {
       resolveRedirect(null);
       await Promise.resolve();
 
-      expect(controller.session()).toEqual({ status: "checking-auth" });
+      expect(controller.session()).toEqual({ status: "CheckingAuth" });
       expect(showNotice).not.toHaveBeenCalled();
 
       changeAuth(null);
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
     });
 
     it.each([
@@ -146,12 +146,12 @@ describe("Session", () => {
       rejectRedirect({ code });
       await Promise.resolve();
 
-      expect(controller.session()).toEqual({ status: "checking-auth" });
+      expect(controller.session()).toEqual({ status: "CheckingAuth" });
       expect(showNotice).toHaveBeenCalledExactlyOnceWith(message);
 
       changeAuth({ uid: "alice", photoURL: "photo.png" });
       expect(controller.session()).toEqual({
-        status: "signed-in",
+        status: "SignedIn",
         user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(onAuthStateChanged).toHaveBeenCalledTimes(1);
@@ -164,7 +164,7 @@ describe("Session", () => {
       await Promise.resolve();
 
       expect(controller.session()).toEqual({
-        status: "signed-in",
+        status: "SignedIn",
         user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(showNotice).toHaveBeenCalledExactlyOnceWith(
@@ -179,7 +179,7 @@ describe("Session", () => {
 
       void controller.signIn();
 
-      expect(controller.session()).toEqual({ status: "signing-in" });
+      expect(controller.session()).toEqual({ status: "SigningIn" });
       expect(signInWithRedirect).toHaveBeenCalledExactlyOnceWith(
         auth,
         expect.any(GoogleAuthProvider),
@@ -191,7 +191,7 @@ describe("Session", () => {
 
       changeAuth({ uid: "alice", photoURL: "photo.png" });
       expect(controller.session()).toEqual({
-        status: "signed-in",
+        status: "SignedIn",
         user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(showNotice).not.toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe("Session", () => {
       await controller.signIn();
       await controller.signOut();
 
-      expect(controller.session()).toEqual({ status: "signing-in" });
+      expect(controller.session()).toEqual({ status: "SigningIn" });
       expect(signInWithRedirect).toHaveBeenCalledTimes(1);
       expect(signOut).not.toHaveBeenCalled();
       expect(showNotice).not.toHaveBeenCalled();
@@ -216,7 +216,7 @@ describe("Session", () => {
       await controller.signIn();
 
       expect(controller.session()).toEqual({
-        status: "signed-in",
+        status: "SignedIn",
         user: { id: "alice", photoUrl: null },
       });
       expect(signInWithRedirect).not.toHaveBeenCalled();
@@ -257,7 +257,7 @@ describe("Session", () => {
 
       await controller.signIn();
 
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
       expect(showNotice).toHaveBeenCalledExactlyOnceWith(message);
     });
 
@@ -268,11 +268,11 @@ describe("Session", () => {
       });
 
       await controller.signIn();
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
 
       void controller.signIn();
 
-      expect(controller.session()).toEqual({ status: "signing-in" });
+      expect(controller.session()).toEqual({ status: "SigningIn" });
       expect(signInWithRedirect).toHaveBeenCalledTimes(2);
       expect(showNotice).toHaveBeenCalledTimes(1);
     });
@@ -288,7 +288,7 @@ describe("Session", () => {
           }),
         );
         const pending = controller.signIn();
-        expect(controller.session()).toEqual({ status: "signing-in" });
+        expect(controller.session()).toEqual({ status: "SigningIn" });
 
         changeAuth(user);
         rejectOperation({ code: "auth/network-request-failed" });
@@ -296,8 +296,8 @@ describe("Session", () => {
 
         expect(controller.session()).toEqual(
           user
-            ? { status: "signed-in", user: { id: user.uid, photoUrl: user.photoURL } }
-            : { status: "signed-out" },
+            ? { status: "SignedIn", user: { id: user.uid, photoUrl: user.photoURL } }
+            : { status: "SignedOut" },
         );
         expect(showNotice).not.toHaveBeenCalled();
       },
@@ -311,19 +311,19 @@ describe("Session", () => {
       const pending = controller.signOut();
 
       expect(controller.session()).toEqual({
-        status: "signing-out",
+        status: "SigningOut",
         user: { id: "alice", photoUrl: "photo.png" },
       });
       expect(signOut).toHaveBeenCalledExactlyOnceWith(auth);
 
       await pending;
       expect(controller.session()).toEqual({
-        status: "signing-out",
+        status: "SigningOut",
         user: { id: "alice", photoUrl: "photo.png" },
       });
 
       changeAuth(null);
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
       expect(showNotice).not.toHaveBeenCalled();
     });
 
@@ -341,7 +341,7 @@ describe("Session", () => {
       await controller.signIn();
 
       expect(controller.session()).toEqual({
-        status: "signing-out",
+        status: "SigningOut",
         user: { id: "alice", photoUrl: null },
       });
       expect(signOut).toHaveBeenCalledTimes(1);
@@ -357,7 +357,7 @@ describe("Session", () => {
 
       await controller.signOut();
 
-      expect(controller.session()).toEqual({ status: "signed-out" });
+      expect(controller.session()).toEqual({ status: "SignedOut" });
       expect(signOut).not.toHaveBeenCalled();
       expect(showNotice).not.toHaveBeenCalled();
     });
@@ -375,7 +375,7 @@ describe("Session", () => {
 
       await controller.signOut();
 
-      expect(controller.session()).toEqual({ status: "signed-in", user });
+      expect(controller.session()).toEqual({ status: "SignedIn", user });
       expect(showNotice).toHaveBeenCalledExactlyOnceWith(message);
     });
 
@@ -387,11 +387,11 @@ describe("Session", () => {
       });
 
       await controller.signOut();
-      expect(controller.session()).toEqual({ status: "signed-in", user });
+      expect(controller.session()).toEqual({ status: "SignedIn", user });
 
       await controller.signOut();
 
-      expect(controller.session()).toEqual({ status: "signing-out", user });
+      expect(controller.session()).toEqual({ status: "SigningOut", user });
       expect(signOut).toHaveBeenCalledTimes(2);
       expect(showNotice).toHaveBeenCalledTimes(1);
     });
@@ -408,7 +408,7 @@ describe("Session", () => {
         );
         const pending = controller.signOut();
         expect(controller.session()).toEqual({
-          status: "signing-out",
+          status: "SigningOut",
           user: { id: "alice", photoUrl: "photo.png" },
         });
 
@@ -418,8 +418,8 @@ describe("Session", () => {
 
         expect(controller.session()).toEqual(
           user
-            ? { status: "signed-in", user: { id: user.uid, photoUrl: user.photoURL } }
-            : { status: "signed-out" },
+            ? { status: "SignedIn", user: { id: user.uid, photoUrl: user.photoURL } }
+            : { status: "SignedOut" },
         );
         expect(showNotice).not.toHaveBeenCalled();
       },

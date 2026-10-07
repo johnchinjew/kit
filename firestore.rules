@@ -28,9 +28,9 @@ service cloud.firestore {
         && data.tasks is map
         && taskId in data.tasks
         && (
-          (operationType == 'createTask'
+          (operationType == 'CreateTask'
             && !(taskId in oldTasks) && validTaskCreation(data.tasks[taskId]))
-          || (operationType in ['setTaskTitle', 'setTaskDetails', 'setTaskDate', 'completeTask', 'reopenTask']
+          || (operationType in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask']
             && taskId in oldTasks && validTaskEdit(data.tasks[taskId], oldTasks[taskId], operationType))
         );
     }
@@ -45,11 +45,11 @@ service cloud.firestore {
 
     function validTaskEdit(task, oldTask, operationType) {
       return task is map && oldTask is map && (
-        (operationType == 'setTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
-        || (operationType == 'setTaskDetails' && newerEdit(task, oldTask, 'detailsEditedAt'))
-        || (operationType == 'setTaskDate' && newerEdit(task, oldTask, 'dateEditedAt'))
-        || (operationType == 'completeTask' && newerEdit(task, oldTask, 'completedEditedAt'))
-        || (operationType == 'reopenTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        (operationType == 'SetTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
+        || (operationType == 'SetTaskDetails' && newerEdit(task, oldTask, 'detailsEditedAt'))
+        || (operationType == 'SetTaskDate' && newerEdit(task, oldTask, 'dateEditedAt'))
+        || (operationType == 'CompleteTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        || (operationType == 'ReopenTask' && newerEdit(task, oldTask, 'completedEditedAt'))
       );
     }
 
