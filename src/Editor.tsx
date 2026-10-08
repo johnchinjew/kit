@@ -1,8 +1,11 @@
+import { intervalLimits, type IntervalUnit, type Recurrence } from "./recurrence";
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import {
   completeTask,
+  setTaskSchedule,
+  deleteTask,
   reopenTask,
   setTaskDate,
   setTaskDetails,
@@ -25,10 +28,19 @@ export default function Editor(props: {
 }) {
   // Capture the task when the editor opens so unmodified fields don't overwrite remote edits
   const initialTask = props.task;
-  const [draft, setDraft] = createSignal<TaskDraft>(initialTask);
+  const currentDate = () => props.task.type === "RepeatingTask" ? props.task.schedule.nextDate : props.task.date;
+  const initialDate = currentDate();
+  const [draft, setDraft] = createSignal<TaskDraft>({ title: initialTask.title, details: initialTask.details, date: initialDate });
+
+  const initialRecurrence = initialTask.type === "RepeatingTask" ? initialTask.schedule.recurrence : undefined;
+  const currentRecurrence = () => props.task.type === "RepeatingTask" ? props.task.schedule.recurrence : undefined;
+  const [unit, setUnit] = createSignal<IntervalUnit | "">(initialRecurrence?.unit ?? "");
+  const [dateTouched, setDateTouched] = createSignal(false);
+  const [every, setEvery] = createSignal(initialRecurrence?.every ?? 1);
+  const readOnly = () => props.task.type === "NonRepeatingTask" && props.task.completedAt !== null;
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.task.completedAt !== null) return;
+    if (readOnly()) return;
     setDraft((current) => ({
       ...current,
       title: event.currentTarget.value
@@ -36,29 +48,35 @@ export default function Editor(props: {
   };
 
   const onChangeDetails: JSX.EventHandler<HTMLTextAreaElement, InputEvent> = (event) => {
-    if (props.task.completedAt !== null) return;
+    if (readOnly()) return;
     setDraft((current) => ({ ...current, details: event.currentTarget.value }));
   };
 
   const onChangeDate: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.task.completedAt !== null) return;
+    if (readOnly()) return;
+    const date = event.currentTarget.value;
+    setDateTouched(true);
     setDraft((current) => ({
       ...current,
-      date: event.currentTarget.value
+      date
     }));
   };
 
   const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
-    if (!saveDate()) return;
+    const saveSchedule = prepareScheduleSave();
+    if (!saveSchedule) return;
     saveTitle();
     saveDetails();
+    saveSchedule();
     props.onBack();
   };
 
   const onClickComplete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
-    if (!saveDate()) return;
+    const saveSchedule = prepareScheduleSave();
+    if (!saveSchedule) return;
     saveTitle();
     saveDetails();
+    saveSchedule();
     void completeTask(props.session.user.id, props.taskId).catch(() => {
       props.showNotice("Could not complete task. Try again later.");
     });
@@ -73,7 +91,7 @@ export default function Editor(props: {
   };
 
   function saveTitle() {
-    if (props.task.completedAt === null && draft().title !== initialTask.title) {
+    if (!readOnly() && draft().title !== initialTask.title) {
       void setTaskTitle(props.session.user.id, props.taskId, draft().title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
@@ -81,32 +99,51 @@ export default function Editor(props: {
   }
 
   function saveDetails() {
-    if (props.task.completedAt === null && draft().details !== initialTask.details) {
+    if (!readOnly() && draft().details !== initialTask.details) {
       void setTaskDetails(props.session.user.id, props.taskId, draft().details).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
   }
 
-  function saveDate() {
-    const date = draft().date;
-    if (props.task.completedAt === null && date !== initialTask.date) {
-      let validatedDate: TaskDate;
-      try {
-        validatedDate = decodeTaskDate(date);
-      } catch {
-        props.showNotice("A date is required.");
-        return false;
-      }
-      if (validatedDate > taskDateOneYearFromToday()) {
-        props.showNotice("The date cannot be more than 1 year in the future.");
-        return false;
-      }
-      void setTaskDate(props.session.user.id, props.taskId, validatedDate).catch(() => {
-        props.showNotice("Could not save task. Try again later.");
-      });
+  function prepareScheduleSave(): (() => void) | undefined {
+    if (readOnly()) return () => {};
+    const dateChanged = dateTouched() && (draft().date !== initialDate || draft().date !== currentDate());
+    const ruleChanged = unit() !== (initialRecurrence?.unit ?? "") || (unit() !== "" && every() !== (initialRecurrence?.every ?? 1));
+    if (!dateChanged && !ruleChanged) return () => {};
+    let date: TaskDate;
+    try {
+      date = decodeTaskDate(dateChanged ? draft().date : currentDate());
+    } catch {
+      props.showNotice("A date is required.");
+      return undefined;
     }
-    return true;
+    if (date > taskDateOneYearFromToday()) {
+      props.showNotice("The date cannot be more than 1 year in the future.");
+      return undefined;
+    }
+    const selectedUnit = unit();
+    if (selectedUnit && (!Number.isInteger(every()) || every() < 1 || every() > intervalLimits[selectedUnit])) {
+      props.showNotice("Choose a whole-number interval of no more than 1 year.");
+      return undefined;
+    }
+    if (initialRecurrence || currentRecurrence() || selectedUnit) {
+      const recurrence: Recurrence | null = selectedUnit ? {
+        type: "Interval", every: every(), unit: selectedUnit,
+        anchor: dateChanged ? date : initialRecurrence?.anchor ?? date,
+      } : null;
+      return () => {
+        void setTaskSchedule(props.session.user.id, props.taskId, date, recurrence).catch(() => {
+          props.showNotice("Could not save schedule. Try again later.");
+        });
+      };
+    } else {
+      return () => {
+        void setTaskDate(props.session.user.id, props.taskId, date).catch(() => {
+          props.showNotice("Could not save task. Try again later.");
+        });
+      };
+    }
   }
 
   return (
@@ -118,33 +155,54 @@ export default function Editor(props: {
         name="title"
         type="text"
         value={draft().title}
-        readOnly={props.task.completedAt !== null}
+        readOnly={readOnly()}
         onInput={onChangeTitle}
       />
       <textarea
         name="details"
         value={draft().details}
-        readOnly={props.task.completedAt !== null}
+        readOnly={readOnly()}
         onInput={onChangeDetails}
       />
+      <label>{unit() ? "Next date" : "Date"}
       <input
         name="date"
         type="date"
         max={taskDateOneYearFromToday()}
-        value={draft().date}
-        readOnly={props.task.completedAt !== null}
+        value={dateTouched() ? draft().date : currentDate()}
+        readOnly={readOnly()}
         onInput={onChangeDate}
       />
-      <Show when={props.task.completedAt === null}>
+      </label>
+      <Show when={!readOnly()}>
+        <label>Repeat
+          <select name="repeat" value={unit()} onChange={(event) => { setUnit(event.currentTarget.value as IntervalUnit | ""); setEvery(1); }}>
+            <option value="">Does not repeat</option>
+            <option value="Days">Days</option>
+            <option value="Weeks">Weeks</option>
+            <option value="Months">Months</option>
+            <option value="Years">Years</option>
+          </select>
+        </label>
+        <Show when={unit()}>
+          <label>Every <input name="interval" type="number" min="1" max={unit() ? intervalLimits[unit() as IntervalUnit] : 1} value={every()} onInput={(event) => setEvery(event.currentTarget.valueAsNumber)} /> {unit().toLowerCase()}</label>
+          <p>Repeats indefinitely.</p>
+        </Show>
+      </Show>
+      <Show when={!readOnly() && !unit() && !currentRecurrence()}>
         <button type="button" onClick={onClickComplete}>
           Complete
         </button>
       </Show>
-      <Show when={props.task.completedAt !== null}>
+      <Show when={readOnly()}>
         <button type="button" onClick={onClickReopen}>
           Reopen
         </button>
       </Show>
+      <button type="button" onClick={() => {
+        void deleteTask(props.session.user.id, props.taskId).catch(() => props.showNotice("Could not delete task. Try again later."));
+        props.onBack();
+      }}>Delete</button>
     </main>
   );
 }

@@ -4,9 +4,9 @@ Just a to-do list.
 
 ## Features
 
-- Schedule view: all non-completed tasks, including projected occurrences of repeating tasks, ordered by date.
+- Schedule view: all non-completed tasks and projected repeating occurrences up to 1 year ahead, ordered by date.
 - Completed view: all completed tasks, ordered by completion date. Tasks are deleted 1 year after completion.
-- Task: title, details, date. Can be completed and reopened. Can be converted into a repeating task by setting a
+- Task: title, details, date. Can be completed, reopened, and deleted. Can be converted into a repeating task by setting a
   repetition schedule. May be a materialized occurrence of a repeating task in which case it is fully independent of the
   repeating task. Every task must have a date (up to 1 year away).
 - Repeating task: title, details, repetition schedule (next date and interval up to 1 year away). Cannot be completed.

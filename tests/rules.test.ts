@@ -9,7 +9,7 @@ let environment: RulesTestEnvironment;
 const oldTime = Timestamp.fromMillis(Date.now() - 10_000);
 const editTime = Timestamp.fromMillis(Date.now() - 5_000);
 const task = {
-  title: "Buy milk", details: "", completed: false, date: "2024-10-04",
+  type: "NonRepeatingTask", title: "Buy milk", details: "", completed: false, date: "2024-10-04",
   titleEditedAt: oldTime, detailsEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
   futureField: 42,
 };
@@ -50,18 +50,35 @@ describe("Firestore security rules", () => {
     for (const db of [alice, anonymous]) {
       await assertFails(setDoc(doc(db, "users/bob"), {
         operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-          title: "", details: "", completed: false, date: "2024-10-04",
+          type: "NonRepeatingTask", title: "", details: "", completed: false, date: "2024-10-04",
           titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
         } },
       }));
     }
   });
 
+  it("rejects task deletion by other users or without removing the specified task", async () => {
+    for (const db of [environment.authenticatedContext("bob").firestore(), environment.unauthenticatedContext().firestore()]) {
+      await assertFails(setDoc(doc(db, "users/alice"), {
+        operation: { type: "DeleteTask", taskId: "task.with.dots" },
+        tasks: { "task.with.dots": deleteField() },
+      }, { merge: true }));
+    }
+    const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+    await assertFails(setDoc(reference, {
+      operation: { type: "DeleteTask", taskId: "missing" }, tasks: { missing: deleteField() },
+    }, { merge: true }));
+    await assertFails(setDoc(reference, {
+      operation: { type: "DeleteTask", taskId: "task.with.dots" }, tasks: { other: deleteField() },
+    }, { merge: true }));
+    expect((await getDoc(reference)).data()!.tasks).toEqual({ "task.with.dots": task, other: task });
+  });
+
   it.each(["bob", "alice"])("creates a task in a missing or existing user document: %s", async (userId) => {
     const db = environment.authenticatedContext(userId).firestore();
     const reference = doc(db, "users", userId);
     const taskId = crypto.randomUUID();
-    const created = { title: "", details: "", completed: false, date: "2024-10-04",
+    const created = { type: "NonRepeatingTask", title: "", details: "", completed: false, date: "2024-10-04",
       titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime };
     await assertSucceeds(setDoc(reference, {
       operation: { type: "CreateTask", taskId }, tasks: { [taskId]: created },
@@ -80,7 +97,7 @@ describe("Firestore security rules", () => {
     const taskId = crypto.randomUUID();
     await assertSucceeds(setDoc(reference, {
       operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-        title: "", details: "", completed: false, date: "2024-10-04",
+        type: "NonRepeatingTask", title: "", details: "", completed: false, date: "2024-10-04",
         titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
       } },
     }, { merge: true }));
@@ -137,7 +154,7 @@ describe("Firestore security rules", () => {
       const db = environment.authenticatedContext("alice").firestore();
       await assertSucceeds(setDoc(doc(db, "users/alice"), {
         operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-          title: "", details: "", completed: false, date: "2024-10-04",
+          type: "NonRepeatingTask", title: "", details: "", completed: false, date: "2024-10-04",
           titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
         } },
       }, { merge: true }));
@@ -168,11 +185,11 @@ describe("Firestore security rules", () => {
       tasks: { "task.with.dots": { [field]: value, [timestampField]: oldTime } } }, { merge: true }));
   });
 
-  it("edits legacy tasks without timestamps without rewriting their other fields", async () => {
+  it("rejects edits to tasks missing their conflict timestamps", async () => {
     await environment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), "users/alice"), {
         tasks: { legacy: {
-          title: "Milk", details: "", completed: false, date: "2024-10-04", futureField: 42,
+          type: "NonRepeatingTask", title: "Milk", details: "", completed: false, date: "2024-10-04", futureField: 42,
         } },
       });
     });
@@ -182,12 +199,11 @@ describe("Firestore security rules", () => {
       ["SetTaskDate", { date: "2024-10-06", dateEditedAt: editTime }],
       ["CompleteTask", { completed: true, completedEditedAt: editTime }],
     ] as const) {
-      await assertSucceeds(setDoc(reference, { operation: { type: taskOperation, taskId: "legacy" },
+      await assertFails(setDoc(reference, { operation: { type: taskOperation, taskId: "legacy" },
         tasks: { legacy: patch } }, { merge: true }));
     }
-    expect((await getDoc(reference)).data()).toMatchObject({
-      operation: { type: "CompleteTask", taskId: "legacy" },
-      tasks: { legacy: { futureField: 42 } },
+    expect((await getDoc(reference)).data()!.tasks.legacy).toEqual({
+      type: "NonRepeatingTask", title: "Milk", details: "", completed: false, date: "2024-10-04", futureField: 42,
     });
   });
 
@@ -294,7 +310,7 @@ describe("Firestore security rules", () => {
     await assertSucceeds(setDoc(reference, {
       operation: { type: "CreateTask", taskId },
       tasks: { [taskId]: {
-        title: "", details: "", completed: false, date,
+        type: "NonRepeatingTask", title: "", details: "", completed: false, date,
         titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime,
       } },
     }, { merge: true }));
@@ -308,7 +324,7 @@ describe("Firestore security rules", () => {
     const taskId = crypto.randomUUID();
     const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
     await assertSucceeds(setDoc(reference, { operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-      title: 42, completed: "invalid", date: null, extra: true,
+      type: "NonRepeatingTask", title: 42, completed: "invalid", date: null, extra: true,
       titleEditedAt: oldTime, detailsEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
     } } }, { merge: true }));
     await assertSucceeds(setDoc(reference, { operation: { type: "SetTaskTitle", taskId },
@@ -332,7 +348,7 @@ describe("Firestore security rules", () => {
     const taskId = crypto.randomUUID();
     const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
     await assertFails(setDoc(reference, { operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-      title: "", details: "", completed: false, date: "2024-10-04",
+      type: "NonRepeatingTask", title: "", details: "", completed: false, date: "2024-10-04",
       titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime, ...patch,
     } } }, { merge: true }));
   });

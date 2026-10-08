@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { expect, it, vi } from "vitest";
-import { completeTask, createTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
+import { advanceTaskSchedule, completeTask, createTask, createTaskOccurrence, deleteTask, setTaskSchedule, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -25,7 +25,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   return { ...firestore, initializeFirestore: vi.fn(firestore.initializeFirestore) };
 });
 
-it("retains offline task creation, title, details, and date editing, completion, and reopening across restarts, then syncs", async () => {
+it("retains offline task creation, title, details, and date editing, completion, reopening, recurrence, and deletion across restarts, then syncs", async () => {
   const storage = new Map<string, string>();
   vi.stubGlobal("window", {
     location: { hostname: "localhost" },
@@ -62,7 +62,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     const created = await getDocFromCache(userDocument);
     expect(created.data()).toEqual({
       operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-        title: "", details: "", completed: false, date: taskDateToday(),
+        type: "NonRepeatingTask", title: "", details: "", completed: false, date: taskDateToday(),
         titleEditedAt: expect.any(Timestamp), detailsEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
         completedEditedAt: expect.any(Timestamp),
       } },
@@ -94,11 +94,50 @@ it("retains offline task creation, title, details, and date editing, completion,
 
     clock.mockReturnValue(Timestamp.fromMillis(startTime + 4_000));
     void reopenTask("offline-user", taskId).catch(() => {});
-    const reopenedData = (await getDocFromCache(restartedDocument)).data();
+    let reopenedData = (await getDocFromCache(restartedDocument)).data();
     expect(reopenedData).toMatchObject({
       operation: { type: "ReopenTask", taskId },
       tasks: { [taskId]: { title: "Buy bread", details: "Whole grain\nTwo loaves", completed: false, date: "2026-10-05" } },
     });
+
+    const scheduleEditedAt = Timestamp.fromMillis(startTime + 5_000);
+    clock.mockReturnValue(scheduleEditedAt);
+    const recurrence = { type: "Interval" as const, unit: "Days" as const, every: 1, anchor: decodeTaskDate("2026-10-05") };
+    void setTaskSchedule("offline-user", taskId, recurrence.anchor, recurrence).catch(() => {});
+    await getDocFromCache(restartedDocument);
+    const occurrenceId = crypto.randomUUID();
+    const repeatingTask = {
+      type: "RepeatingTask" as const, title: "Buy bread", details: "Whole grain\nTwo loaves",
+      schedule: { nextDate: recurrence.anchor, recurrence }, scheduleEditedAt,
+    };
+    void createTaskOccurrence("offline-user", occurrenceId, repeatingTask).catch(() => {});
+    void advanceTaskSchedule("offline-user", taskId, repeatingTask, occurrenceId).catch(() => {});
+    reopenedData = (await getDocFromCache(restartedDocument)).data();
+    expect(reopenedData!.tasks[taskId]).toMatchObject({ schedule: { nextDate: "2026-10-06", recurrence } });
+    expect(Object.keys(reopenedData!.tasks)).toHaveLength(2);
+    expect(reopenedData!.tasks[taskId].date).toBeUndefined();
+    expect(reopenedData!.tasks[taskId].completed).toBeUndefined();
+    expect(reopenedData!.tasks[taskId].completedEditedAt).toBeUndefined();
+
+    clock.mockReturnValue(Timestamp.fromMillis(startTime + 6_000));
+    void setTaskSchedule("offline-user", taskId, decodeTaskDate("2026-10-06"), null).catch(() => {});
+    const converted = (await getDocFromCache(restartedDocument)).data()!.tasks[taskId];
+    expect(converted).toMatchObject({ type: "NonRepeatingTask", date: "2026-10-06", completed: false });
+    expect(converted.schedule).toBeUndefined();
+    expect(converted.scheduleEditedAt).toBeUndefined();
+    clock.mockReturnValue(Timestamp.fromMillis(startTime + 7_000));
+    void setTaskSchedule("offline-user", taskId, decodeTaskDate("2026-10-06"), recurrence).catch(() => {});
+    reopenedData = (await getDocFromCache(restartedDocument)).data();
+    expect(reopenedData!.tasks[taskId]).toMatchObject({
+      type: "RepeatingTask", schedule: { nextDate: "2026-10-06", recurrence },
+      scheduleEditedAt: Timestamp.fromMillis(startTime + 7_000),
+    });
+
+
+    void deleteTask("offline-user", occurrenceId).catch(() => {});
+    reopenedData = (await getDocFromCache(restartedDocument)).data();
+    expect(reopenedData!.operation).toEqual({ type: "DeleteTask", taskId: occurrenceId });
+    expect(Object.keys(reopenedData!.tasks)).toEqual([taskId]);
 
     await terminate(firestore);
     await deleteApp(app);

@@ -1,10 +1,11 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import Editor from "./Editor";
-import { formatTaskDate } from "./taskDate";
+import { occurrenceDates } from "./recurrence";
+import { formatTaskDate, taskDateToday, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import { formatDate } from "./date";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn, type SigningOut } from "./session";
-import { createTask, emptyUserData, subscribeUserData, type UserData } from "./userData";
+import { advanceTaskSchedule, createTask, createTaskOccurrence, emptyUserData, subscribeUserData, type Task, type UserData } from "./userData";
 
 export default function App() {
   const { notice, showNotice } = createNotice();
@@ -52,11 +53,37 @@ function AppSignedIn(props: {
 
   createEffect(() => {
     setUserData(emptyUserData());
-    const unsubscribe = subscribeUserData(props.session.user.id, setUserData, () => {
+    let materialized = false;
+    const userId = props.session.user.id;
+    const unsubscribe = subscribeUserData(userId, (data) => {
+      setUserData(data);
+      if (materialized) return;
+      materialized = true;
+      const today = taskDateToday();
+      const writes: Promise<void>[] = [];
+      for (const [id, task] of Object.entries(data.tasks)) {
+        if (task.type !== "RepeatingTask") continue;
+        for (const date of occurrenceDates(task.schedule.recurrence, task.schedule.nextDate, today)) {
+          const occurrenceId = crypto.randomUUID();
+          const occurrence = { ...task, schedule: { ...task.schedule, nextDate: date } };
+          writes.push(createTaskOccurrence(userId, occurrenceId, occurrence));
+          writes.push(advanceTaskSchedule(userId, id, occurrence, occurrenceId));
+        }
+      }
+      void Promise.all(writes).catch(() => {
+        props.showNotice("Could not update repeating tasks. Close and reopen Kit to try again later.");
+      });
+    }, () => {
       props.showNotice("There was a problem loading your data. The displayed tasks may be outdated.");
     });
     onCleanup(unsubscribe);
   });
+
+  function rows() {
+    return Object.entries(userData().tasks).flatMap<readonly [string, Task, TaskDate]>(([id, task]) => task.type === "RepeatingTask"
+      ? occurrenceDates(task.schedule.recurrence, task.schedule.nextDate, taskDateOneYearFromToday()).map((date) => [id, task, date] as const)
+      : [[id, task, task.date] as const]);
+  }
 
   function addTask() {
     const taskId = crypto.randomUUID();
@@ -85,28 +112,29 @@ function AppSignedIn(props: {
           <option value="Completed">Completed</option>
         </select>
         <ul>
-          <For each={Object.entries(userData().tasks).filter(([, task]) => {
+          <For each={rows().filter(([, task]) => {
             switch (listMode()) {
-              case "Schedule": return task.completedAt === null;
-              case "Completed": return task.completedAt !== null;
+              case "Schedule": return task.type === "RepeatingTask" || task.completedAt === null;
+              case "Completed": return task.type === "NonRepeatingTask" && task.completedAt !== null;
             }
-          }).sort(([, left], [, right]) => {
+          }).sort(([, left, leftDate], [, right, rightDate]) => {
             switch (listMode()) {
-              case "Schedule": return left.date.localeCompare(right.date);
+              case "Schedule": return leftDate.localeCompare(rightDate);
               case "Completed": {
-                if (left.completedAt === null || right.completedAt === null) return 0;
+                if (left.type !== "NonRepeatingTask" || right.type !== "NonRepeatingTask"
+                  || left.completedAt === null || right.completedAt === null) return 0;
                 return right.completedAt.seconds - left.completedAt.seconds
                   || right.completedAt.nanoseconds - left.completedAt.nanoseconds;
               }
             }
           })}>
-            {([taskId, task]) => (
+            {([taskId, task, date]) => (
               <li>
                 <button type="button" onClick={() => setSelectedTaskId(taskId)}>
-                  {task.title}
+                  {task.title || "Untitled"}{task.type === "RepeatingTask" ? " ↻" : ""}
                 </button>
-                <Show when={task.completedAt} fallback={
-                  <time dateTime={task.date}>{formatTaskDate(task.date)}</time>
+                <Show when={task.type === "NonRepeatingTask" && task.completedAt} fallback={
+                  <time dateTime={date}>{formatTaskDate(date)}</time>
                 }>
                   {(completedAt) => (
                     <time dateTime={completedAt().toDate().toISOString()}>
@@ -126,7 +154,7 @@ function AppSignedIn(props: {
       </Match>
       <Match when={selectedTaskId()}>
         {(taskId) => (
-          <Show when={userData().tasks[taskId()]} fallback={<p>Loading task</p>}>
+          <Show when={userData().tasks[taskId()]} fallback={<><p>Task unavailable</p><button type="button" onClick={() => setSelectedTaskId(undefined)}>Back</button></>}>
             {(task) => (
               <Editor
                 taskId={taskId()}

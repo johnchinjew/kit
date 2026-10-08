@@ -5,9 +5,11 @@ import { render } from "solid-js/web";
 import { afterEach, expect, it, vi } from "vitest";
 import { decodeTaskDate } from "../src/taskDate";
 import Editor from "../src/Editor";
-import { completeTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, type Task } from "../src/userData";
+import { completeTask, deleteTask, setTaskSchedule, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, type Task } from "../src/userData";
 
 vi.mock("../src/userData", () => ({
+  setTaskSchedule: vi.fn().mockResolvedValue(undefined),
+  deleteTask: vi.fn().mockResolvedValue(undefined),
   completeTask: vi.fn().mockResolvedValue(undefined),
   reopenTask: vi.fn().mockResolvedValue(undefined),
   setTaskDetails: vi.fn().mockResolvedValue(undefined),
@@ -29,7 +31,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
+      task={{ type: "NonRepeatingTask", title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
       session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={onBack}
@@ -49,7 +51,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   details.value = "Changed details";
   details.dispatchEvent(new Event("input", { bubbles: true }));
   const buttons = [...document.querySelectorAll("button")];
-  expect(buttons.map((button) => button.textContent)).toEqual(["Back", "Reopen"]);
+  expect(buttons.map((button) => button.textContent)).toEqual(["Back", "Reopen", "Delete"]);
   buttons.find((button) => button.textContent === action)!.click();
 
   expect(setTaskDetails).not.toHaveBeenCalled();
@@ -68,7 +70,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      task={{ type: "NonRepeatingTask", title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
@@ -98,7 +100,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
 });
 
 it("does not save a draft if the task is completed on another device", () => {
-  const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
+  const [task, setTask] = createSignal<Task>({ type: "NonRepeatingTask", title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
     <Editor
       taskId="first"
@@ -118,7 +120,7 @@ it("does not save a draft if the task is completed on another device", () => {
   details.dispatchEvent(new Event("input", { bubbles: true }));
   input.value = "Buy eggs";
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  setTask({ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() });
+  setTask({ type: "NonRepeatingTask", title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() });
   expect(input.readOnly).toBe(true);
   expect(date.readOnly).toBe(true);
   expect(details.readOnly).toBe(true);
@@ -135,7 +137,7 @@ it("prevents saving a cleared task date", () => {
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      task={{ type: "NonRepeatingTask", title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -160,7 +162,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
   dispose = render(() => (
     <Editor
       taskId="first"
-      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      task={{ type: "NonRepeatingTask", title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -187,7 +189,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
 });
 
 it.each(["title", "date", "details"] as const)("saves only the edited %s when the other field changes remotely", (field) => {
-  const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
+  const [task, setTask] = createSignal<Task>({ type: "NonRepeatingTask", title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
     <Editor
       taskId="first"
@@ -202,8 +204,8 @@ it.each(["title", "date", "details"] as const)("saves only the edited %s when th
   input.value = field === "title" ? "Buy eggs" : field === "date" ? "2026-10-05" : "Two loaves";
   input.dispatchEvent(new Event("input", { bubbles: true }));
   setTask(field === "title"
-    ? { title: "Buy bread", details: "Remote details", completedAt: null, date: decodeTaskDate("2026-10-06") }
-    : { title: "Buy milk", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
+    ? { type: "NonRepeatingTask", title: "Buy bread", details: "Remote details", completedAt: null, date: decodeTaskDate("2026-10-06") }
+    : { type: "NonRepeatingTask", title: "Buy milk", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
 
   if (field === "title") {
@@ -225,7 +227,7 @@ it("can clear details and reports a failed save", async () => {
   vi.mocked(setTaskDetails).mockRejectedValueOnce(new Error("Offline"));
   dispose = render(() => (
     <Editor taskId="first"
-      task={{ title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+      task={{ type: "NonRepeatingTask", title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null }}
       session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
       showNotice={showNotice} onBack={vi.fn()} />
   ), document.body);
@@ -236,4 +238,89 @@ it("can clear details and reports a failed save", async () => {
   expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "");
   await Promise.resolve();
   expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not save task. Try again later.");
+});
+
+
+it("converts a task to recurrence, using the chosen date as its anchor", () => {
+  dispose = render(() => <Editor taskId="first"
+    task={{ type: "NonRepeatingTask", title: "Rent", details: "", date: decodeTaskDate("2026-01-31"), completedAt: null }}
+    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    showNotice={vi.fn()} onBack={vi.fn()} />, document.body);
+  const repeat = document.querySelector<HTMLSelectElement>('[name="repeat"]')!;
+  repeat.value = "Months";
+  repeat.dispatchEvent(new Event("change", { bubbles: true }));
+  expect([...document.querySelectorAll("button")].some((button) => button.textContent === "Complete")).toBe(false);
+  document.querySelector("button")!.click();
+  expect(setTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "first", "2026-01-31", {
+    type: "Interval", every: 1, unit: "Months", anchor: "2026-01-31",
+  });
+});
+
+it.each(["none", "interval", "date"])("edits a repeating schedule: %s", (change) => {
+  const initial: Task = { type: "RepeatingTask", title: "Rent", details: "", schedule: { nextDate: decodeTaskDate("2026-02-28"),
+    recurrence: { type: "Interval", unit: "Months", every: 1, anchor: decodeTaskDate("2026-01-31") } },
+    scheduleEditedAt: Timestamp.now() };
+  const [task, setTask] = createSignal(initial);
+  dispose = render(() => <Editor taskId="first" task={task()}
+    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    showNotice={vi.fn()} onBack={vi.fn()} />, document.body);
+  if (change === "none") {
+    setTask({ ...initial, schedule: { ...initial.schedule, nextDate: decodeTaskDate("2026-03-31") } });
+    expect(document.querySelector<HTMLInputElement>('[name="date"]')!.value).toBe("2026-03-31");
+    const repeat = document.querySelector<HTMLSelectElement>('[name="repeat"]')!;
+    repeat.value = "";
+    repeat.dispatchEvent(new Event("change", { bubbles: true }));
+  } else {
+    const input = document.querySelector<HTMLInputElement>(`[name="${change}"]`)!;
+    input.value = change === "interval" ? "2" : "2026-02-27";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  document.querySelector("button")!.click();
+  expect(setTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "first",
+    change === "none" ? "2026-03-31" : change === "date" ? "2026-02-27" : "2026-02-28",
+    change === "none" ? null : {
+      type: "Interval", unit: "Months", every: change === "interval" ? 2 : 1,
+      anchor: change === "date" ? "2026-02-27" : "2026-01-31",
+    });
+});
+
+it.each(["incomplete", "completed", "repeating"])("deletes a %s task without saving its draft", (state) => {
+  const task: Task = state === "repeating" ? {
+    type: "RepeatingTask", title: "Rent", details: "Pay", schedule: {
+      nextDate: decodeTaskDate("2026-01-31"),
+      recurrence: { type: "Interval", unit: "Months", every: 1, anchor: decodeTaskDate("2026-01-31") },
+    }, scheduleEditedAt: Timestamp.now(),
+  } : {
+    type: "NonRepeatingTask", title: "Rent", details: "Pay", date: decodeTaskDate("2026-01-31"),
+    completedAt: state === "completed" ? Timestamp.now() : null,
+  };
+  const onBack = vi.fn();
+  dispose = render(() => <Editor taskId="first" task={task}
+    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    showNotice={vi.fn()} onBack={onBack} />, document.body);
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  title.value = "Unsaved title";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+  const date = document.querySelector<HTMLInputElement>('[name="date"]')!;
+  date.value = "";
+  date.dispatchEvent(new Event("input", { bubbles: true }));
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+  expect(deleteTask).toHaveBeenCalledExactlyOnceWith("alice", "first");
+  expect(setTaskTitle).not.toHaveBeenCalled();
+  expect(setTaskDetails).not.toHaveBeenCalled();
+  expect(setTaskDate).not.toHaveBeenCalled();
+  expect(setTaskSchedule).not.toHaveBeenCalled();
+  expect(onBack).toHaveBeenCalledOnce();
+});
+
+it("reports a failed deletion", async () => {
+  const showNotice = vi.fn();
+  vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Delete failed"));
+  dispose = render(() => <Editor taskId="first"
+    task={{ type: "NonRepeatingTask", title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
+    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    showNotice={showNotice} onBack={vi.fn()} />, document.body);
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+  await Promise.resolve();
+  expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not delete task. Try again later.");
 });
