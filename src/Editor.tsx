@@ -3,6 +3,7 @@ import type { SignedIn } from "./session";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import {
   completeTask,
+  deleteTask,
   reopenTask,
   setTaskDate,
   setTaskDetails,
@@ -68,6 +69,13 @@ export default function Editor(props: {
   const onClickReopen: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
     void reopenTask(props.session.user.id, props.taskId).catch(() => {
       props.showNotice("Could not reopen task. Try again later.");
+    });
+    props.onBack();
+  };
+
+  const onClickDelete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    void deleteTask(props.session.user.id, props.taskId).catch(() => {
+      props.showNotice("Could not delete task. Try again later.");
     });
     props.onBack();
   };
@@ -145,6 +153,9 @@ export default function Editor(props: {
           Reopen
         </button>
       </Show>
+      <button type="button" onClick={onClickDelete}>
+        Delete
+      </button>
     </main>
   );
 }

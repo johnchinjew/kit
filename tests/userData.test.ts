@@ -1,5 +1,6 @@
 import {
   doc,
+  deleteField,
   getFirestore,
   onSnapshot,
   setDoc,
@@ -10,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { completeTask, createTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, subscribeUserData } from "../src/userData";
+import { completeTask, createTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, subscribeUserData } from "../src/userData";
 
 vi.mock("firebase/firestore", async (importOriginal) => ({
   ...await importOriginal<typeof import("firebase/firestore")>(),
@@ -84,6 +85,28 @@ describe("User data: task creation", () => {
     vi.mocked(setDoc).mockImplementationOnce(() => { throw error; });
 
     await expect(createTask("alice", "first")).rejects.toBe(error);
+  });
+});
+
+describe("User data: task deletion", () => {
+  it("removes the specified literal task ID and propagates write failures", async () => {
+    vi.resetAllMocks();
+    const firestore = {} as Firestore;
+    const userDocument = {} as DocumentReference;
+    vi.mocked(getFirestore).mockReturnValue(firestore);
+    vi.mocked(doc).mockReturnValue(userDocument);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+
+    await expect(deleteTask("alice", "task.with.dots")).resolves.toBeUndefined();
+    expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
+    expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
+      operation: { type: "DeleteTask", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": deleteField() },
+    }, { merge: true });
+
+    const error = new Error("Delete failed");
+    vi.mocked(setDoc).mockRejectedValueOnce(error);
+    await expect(deleteTask("alice", "first")).rejects.toBe(error);
   });
 });
 

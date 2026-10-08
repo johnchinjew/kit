@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { expect, it, vi } from "vitest";
-import { completeTask, createTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
+import { completeTask, createTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -25,7 +25,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   return { ...firestore, initializeFirestore: vi.fn(firestore.initializeFirestore) };
 });
 
-it("retains offline task creation, title, details, and date editing, completion, and reopening across restarts, then syncs", async () => {
+it("retains offline task creation, title, details, and date editing, completion, reopening, and deletion across restarts, then syncs", async () => {
   const storage = new Map<string, string>();
   vi.stubGlobal("window", {
     location: { hostname: "localhost" },
@@ -100,6 +100,14 @@ it("retains offline task creation, title, details, and date editing, completion,
       tasks: { [taskId]: { title: "Buy bread", details: "Whole grain\nTwo loaves", completed: false, date: "2026-10-05" } },
     });
 
+    const deletedTaskId = "task.with.dots";
+    void createTask("offline-user", deletedTaskId).catch(() => {});
+    void deleteTask("offline-user", deletedTaskId).catch(() => {});
+    const deletedData = (await getDocFromCache(restartedDocument)).data();
+    expect(deletedData).toEqual({
+      ...reopenedData, operation: { type: "DeleteTask", taskId: deletedTaskId },
+    });
+
     await terminate(firestore);
     await deleteApp(app);
     app = initializeApp(options);
@@ -108,7 +116,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     await disableNetwork(firestore);
     const finalDocument = doc(firestore, "users", "offline-user");
     const final = await getDocFromCache(finalDocument);
-    expect(final.data()).toEqual(reopenedData);
+    expect(final.data()).toEqual(deletedData);
     expect(final.metadata.hasPendingWrites).toBe(true);
 
     await enableNetwork(firestore);

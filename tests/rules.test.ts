@@ -57,6 +57,49 @@ describe("Firestore security rules", () => {
     }
   });
 
+  it.each([false, true])("deletes a task with completed=%s and rejects subsequent edits", async (completed) => {
+    const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+    if (completed) await setDoc(reference, {
+      operation: { type: "CompleteTask", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": { completed: true, completedEditedAt: editTime } },
+    }, { merge: true });
+    await assertSucceeds(setDoc(reference, {
+      operation: { type: "DeleteTask", taskId: "task.with.dots" },
+      tasks: { "task.with.dots": deleteField() },
+    }, { merge: true }));
+    expect((await getDoc(reference)).data()).toEqual({
+      futureField: true, operation: { type: "DeleteTask", taskId: "task.with.dots" }, tasks: { other: task },
+    });
+    for (const [type, patch] of [
+      ["SetTaskTitle", { title: "Stale edit", titleEditedAt: editTime }],
+      ["CompleteTask", { completed: true, completedEditedAt: editTime }],
+      ["ReopenTask", { completed: false, completedEditedAt: editTime }],
+      ["DeleteTask", deleteField()],
+    ] as const) {
+      await assertFails(setDoc(reference, {
+        operation: { type, taskId: "task.with.dots" }, tasks: { "task.with.dots": patch },
+      }, { merge: true }));
+    }
+    expect((await getDoc(reference)).data()!.tasks).toEqual({ other: task });
+  });
+
+  it("rejects task deletion by other users or without removing the specified task", async () => {
+    for (const db of [environment.authenticatedContext("bob").firestore(), environment.unauthenticatedContext().firestore()]) {
+      await assertFails(setDoc(doc(db, "users/alice"), {
+        operation: { type: "DeleteTask", taskId: "task.with.dots" },
+        tasks: { "task.with.dots": deleteField() },
+      }, { merge: true }));
+    }
+    const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+    await assertFails(setDoc(reference, {
+      operation: { type: "DeleteTask", taskId: "missing" }, tasks: { missing: deleteField() },
+    }, { merge: true }));
+    await assertFails(setDoc(reference, {
+      operation: { type: "DeleteTask", taskId: "task.with.dots" }, tasks: { other: deleteField() },
+    }, { merge: true }));
+    expect((await getDoc(reference)).data()!.tasks).toEqual({ "task.with.dots": task, other: task });
+  });
+
   it.each(["bob", "alice"])("creates a task in a missing or existing user document: %s", async (userId) => {
     const db = environment.authenticatedContext(userId).firestore();
     const reference = doc(db, "users", userId);

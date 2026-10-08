@@ -5,9 +5,10 @@ import { render } from "solid-js/web";
 import { afterEach, expect, it, vi } from "vitest";
 import { decodeTaskDate } from "../src/taskDate";
 import Editor from "../src/Editor";
-import { completeTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, type Task } from "../src/userData";
+import { completeTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, type Task } from "../src/userData";
 
 vi.mock("../src/userData", () => ({
+  deleteTask: vi.fn().mockResolvedValue(undefined),
   completeTask: vi.fn().mockResolvedValue(undefined),
   reopenTask: vi.fn().mockResolvedValue(undefined),
   setTaskDetails: vi.fn().mockResolvedValue(undefined),
@@ -49,7 +50,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   details.value = "Changed details";
   details.dispatchEvent(new Event("input", { bubbles: true }));
   const buttons = [...document.querySelectorAll("button")];
-  expect(buttons.map((button) => button.textContent)).toEqual(["Back", "Reopen"]);
+  expect(buttons.map((button) => button.textContent)).toEqual(["Back", "Reopen", "Delete"]);
   buttons.find((button) => button.textContent === action)!.click();
 
   expect(setTaskDetails).not.toHaveBeenCalled();
@@ -236,4 +237,39 @@ it("can clear details and reports a failed save", async () => {
   expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "");
   await Promise.resolve();
   expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not save task. Try again later.");
+});
+
+it.each(["incomplete", "completed"])("deletes a %s task without saving its draft", (state) => {
+  const task: Task = {
+    title: "Rent", details: "Pay", date: decodeTaskDate("2026-01-31"),
+    completedAt: state === "completed" ? Timestamp.now() : null,
+  };
+  const onBack = vi.fn();
+  dispose = render(() => <Editor taskId="first" task={task}
+    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    showNotice={vi.fn()} onBack={onBack} />, document.body);
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  title.value = "Unsaved title";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+  const date = document.querySelector<HTMLInputElement>('[name="date"]')!;
+  date.value = "";
+  date.dispatchEvent(new Event("input", { bubbles: true }));
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+  expect(deleteTask).toHaveBeenCalledExactlyOnceWith("alice", "first");
+  expect(setTaskTitle).not.toHaveBeenCalled();
+  expect(setTaskDetails).not.toHaveBeenCalled();
+  expect(setTaskDate).not.toHaveBeenCalled();
+  expect(onBack).toHaveBeenCalledOnce();
+});
+
+it("reports a failed deletion", async () => {
+  const showNotice = vi.fn();
+  vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Delete failed"));
+  dispose = render(() => <Editor taskId="first"
+    task={{ title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
+    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    showNotice={showNotice} onBack={vi.fn()} />, document.body);
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+  await Promise.resolve();
+  expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not delete task. Try again later.");
 });

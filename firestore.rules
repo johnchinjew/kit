@@ -26,12 +26,15 @@ service cloud.firestore {
       return oldTasks is map
         && taskId is string
         && data.tasks is map
-        && taskId in data.tasks
         && (
           (operationType == 'CreateTask'
-            && !(taskId in oldTasks) && validTaskCreation(data.tasks[taskId]))
+            && !(taskId in oldTasks) && taskId in data.tasks
+            && validTaskCreation(data.tasks[taskId]))
+          || (operationType == 'DeleteTask'
+            && taskId in oldTasks && !(taskId in data.tasks))
           || (operationType in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask']
-            && taskId in oldTasks && validTaskEdit(data.tasks[taskId], oldTasks[taskId], operationType))
+            && taskId in oldTasks && taskId in data.tasks
+            && validTaskEdit(data.tasks[taskId], oldTasks[taskId], operationType))
         );
     }
 

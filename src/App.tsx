@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import Editor from "./Editor";
 import { formatTaskDate } from "./taskDate";
 import { formatDate } from "./date";
@@ -52,7 +52,11 @@ function AppSignedIn(props: {
 
   createEffect(() => {
     setUserData(emptyUserData());
-    const unsubscribe = subscribeUserData(props.session.user.id, setUserData, () => {
+    const unsubscribe = subscribeUserData(props.session.user.id, (data) => untrack(() => {
+      const taskId = selectedTaskId();
+      if (taskId && userData().tasks[taskId] && !data.tasks[taskId]) setSelectedTaskId(undefined);
+      setUserData(data);
+    }), () => {
       props.showNotice("There was a problem loading your data. The displayed tasks may be outdated.");
     });
     onCleanup(unsubscribe);

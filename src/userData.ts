@@ -1,5 +1,6 @@
 import {
   doc,
+  deleteField,
   getFirestore,
   onSnapshot,
   setDoc,
@@ -66,6 +67,13 @@ export async function reopenTask(userId: string, taskId: string): Promise<void> 
   await setDoc(doc(getFirestore(), "users", userId), {
     operation: { type: "ReopenTask", taskId },
     tasks: { [taskId]: { completed: false, completedEditedAt: Timestamp.now() } },
+  }, { merge: true });
+}
+
+export async function deleteTask(userId: string, taskId: string): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    operation: { type: "DeleteTask", taskId },
+    tasks: { [taskId]: deleteField() },
   }, { merge: true });
 }
 
