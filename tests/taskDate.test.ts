@@ -1,11 +1,18 @@
 import { afterEach, expect, expectTypeOf, it, vi } from "vitest";
-import { decodeTaskDate, formatTaskDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "../src/taskDate";
+import { decodeTaskDate, formatTaskDate, taskDateFromUtcDate, taskDateOneYearFromToday, taskDateToday, utcDateFromTaskDate, type TaskDate } from "../src/taskDate";
 import { type Task, setTaskDate } from "../src/userData";
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllEnvs();
+});
+
+it("converts task dates using UTC regardless of the local time zone", () => {
+  vi.stubEnv("TZ", "America/Los_Angeles");
+  const date = decodeTaskDate("2024-02-29");
+  expect(utcDateFromTaskDate(date).toISOString()).toBe("2024-02-29T00:00:00.000Z");
+  expect(taskDateFromUtcDate(new Date("2024-02-29T01:00:00Z"))).toBe(date);
 });
 
 it.each([
