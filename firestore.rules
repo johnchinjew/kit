@@ -32,14 +32,29 @@ service cloud.firestore {
             && validTaskCreation(data.tasks[taskId]))
           || (operationType == 'DeleteTask'
             && taskId in oldTasks && !(taskId in data.tasks))
-          || (operationType in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask']
+          || (operationType in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask', 'SetTaskSchedule', 'RemoveTaskSchedule']
             && taskId in oldTasks && taskId in data.tasks
             && validTaskEdit(data.tasks[taskId], oldTasks[taskId], operationType))
+          || (operationType == 'AdvanceTaskSchedule'
+            && taskId in oldTasks && taskId in data.tasks
+            && validScheduleAdvancement(data, oldTasks, taskId))
         );
+    }
+
+    function validScheduleAdvancement(data, oldTasks, taskId) {
+      let oldTask = oldTasks[taskId];
+      let op = data.operation;
+      return oldTask.type == 'RepeatingTask'
+        && oldTask.scheduleEditedAt == op.scheduleEditedAt
+        && op.occurrenceId is string && op.occurrenceId in oldTasks
+        && data.tasks[taskId].schedule.nextDate > oldTask.schedule.nextDate
+        && data.tasks[taskId].type == 'RepeatingTask'
+        && data.tasks[taskId].scheduleEditedAt == oldTask.scheduleEditedAt;
     }
 
     function validTaskCreation(task) {
       return task is map
+        && task.type == 'NonRepeatingTask'
         && validEditTime(task.titleEditedAt)
         && validEditTime(task.detailsEditedAt)
         && validEditTime(task.dateEditedAt)
@@ -48,17 +63,30 @@ service cloud.firestore {
 
     function validTaskEdit(task, oldTask, operationType) {
       return task is map && oldTask is map && (
-        (operationType == 'SetTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
+        (operationType == 'SetTaskSchedule' && task.type == 'RepeatingTask' && (oldTask.type == 'RepeatingTask' || oldTask.completed == false) && validScheduleEdit(task, oldTask))
+        || (operationType == 'RemoveTaskSchedule' && oldTask.type == 'RepeatingTask' && task.type == 'NonRepeatingTask' && validScheduleEdit(task, oldTask))
+        || (operationType == 'SetTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
         || (operationType == 'SetTaskDetails' && newerEdit(task, oldTask, 'detailsEditedAt'))
-        || (operationType == 'SetTaskDate' && newerEdit(task, oldTask, 'dateEditedAt'))
-        || (operationType == 'CompleteTask' && newerEdit(task, oldTask, 'completedEditedAt'))
-        || (operationType == 'ReopenTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        || (operationType == 'SetTaskDate' && oldTask.type == 'NonRepeatingTask' && task.type == 'NonRepeatingTask' && newerEdit(task, oldTask, 'dateEditedAt'))
+        || (operationType == 'CompleteTask' && oldTask.type == 'NonRepeatingTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        || (operationType == 'ReopenTask' && oldTask.type == 'NonRepeatingTask' && newerEdit(task, oldTask, 'completedEditedAt'))
       );
+    }
+
+    function validScheduleEdit(task, oldTask) {
+      let oldField = oldTask.type == 'RepeatingTask' ? 'scheduleEditedAt' : 'dateEditedAt';
+      let newField = task.type == 'RepeatingTask' ? 'scheduleEditedAt' : 'dateEditedAt';
+      return task.type in ['NonRepeatingTask', 'RepeatingTask']
+        && oldTask.type in ['NonRepeatingTask', 'RepeatingTask']
+        && validEditTime(task[newField])
+        && task[newField] > oldTask[oldField]
+        && (oldTask.type == 'RepeatingTask' || task[newField] > oldTask.completedEditedAt)
+        && (task.type == 'RepeatingTask' || (task.completed == false && task.completedEditedAt == task.dateEditedAt));
     }
 
     function newerEdit(data, oldData, field) {
       return validEditTime(data[field])
-        && data[field] > oldData.get(field, timestamp.value(0));
+        && data[field] > oldData[field];
     }
 
     function validEditTime(value) {
