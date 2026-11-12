@@ -6,11 +6,10 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
+import type { Task } from "./task";
 import { decodeTaskDate, taskDateToday, type TaskDate } from "./taskDate";
 
 export type UserData = { tasks: Record<string, Task>; };
-
-export type Task = { title: string; details: string; date: TaskDate; completedAt: Timestamp | null; };
 
 export function emptyUserData(): UserData {
   return { tasks: {} };

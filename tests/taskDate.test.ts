@@ -1,6 +1,7 @@
 import { afterEach, expect, expectTypeOf, it, vi } from "vitest";
 import { decodeTaskDate, formatTaskDate, taskDateFromUtcDate, taskDateOneYearFromToday, taskDateToday, utcDateFromTaskDate, type TaskDate } from "../src/taskDate";
-import { type Task, setTaskDate } from "../src/userData";
+import type { Task } from "../src/task";
+import { setTaskDate } from "../src/userData";
 
 afterEach(() => {
   vi.restoreAllMocks();

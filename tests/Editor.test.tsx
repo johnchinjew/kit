@@ -5,7 +5,8 @@ import { render } from "solid-js/web";
 import { afterEach, expect, it, vi } from "vitest";
 import { decodeTaskDate } from "../src/taskDate";
 import Editor from "../src/Editor";
-import { completeTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, type Task } from "../src/userData";
+import type { Task } from "../src/task";
+import { completeTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/userData", () => ({
   deleteTask: vi.fn().mockResolvedValue(undefined),

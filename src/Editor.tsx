@@ -1,5 +1,6 @@
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
+import type { Task } from "./task";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import {
   completeTask,
@@ -8,7 +9,6 @@ import {
   setTaskDate,
   setTaskDetails,
   setTaskTitle,
-  type Task
 } from "./userData";
 
 type TaskDraft = {
