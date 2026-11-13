@@ -1,0 +1,193 @@
+import { createSignal, type JSX } from "solid-js";
+import { maxInterval, type IntervalUnit, type RepeatingTask, type Schedule } from "./repeatingTask";
+import type { SignedIn } from "./session";
+import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
+import {
+  deleteRepeatingTask,
+  setRepeatingTaskSchedule,
+  setRepeatingTaskDetails,
+  setRepeatingTaskTitle,
+} from "./userData";
+
+type RepeatingTaskDraft = {
+  title: string;
+  details: string;
+  schedule: ScheduleDraft;
+};
+
+type ScheduleDraft = {
+  nextDate: string;
+  interval: number;
+  intervalUnit: IntervalUnit;
+  anchorDate: TaskDate;
+};
+
+export default function RepeatingTaskEditor(props: {
+  repeatingTaskId: string;
+  repeatingTask: RepeatingTask;
+  session: SignedIn;
+  showNotice: (message: string) => void;
+  onBack: () => void;
+}) {
+  // Capture the repeating task when the editor opens so unmodified fields don't overwrite remote edits.
+  const initialRepeatingTask = props.repeatingTask;
+  const [draft, setDraft] = createSignal<RepeatingTaskDraft>(initialRepeatingTask);
+
+  const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
+    setDraft((current) => ({
+      ...current,
+      title: event.currentTarget.value
+    }));
+  };
+
+  const onChangeDetails: JSX.EventHandler<HTMLTextAreaElement, InputEvent> = (event) => {
+    setDraft((current) => ({ ...current, details: event.currentTarget.value }));
+  };
+
+  const onChangeNextDate: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
+    setDraft((current) => ({
+      ...current,
+      schedule: {
+        ...current.schedule,
+        nextDate: event.currentTarget.value
+      }
+    }));
+  };
+
+  const onChangeIntervalUnit: JSX.EventHandler<HTMLSelectElement, Event> = (event) => {
+    const intervalUnit = event.currentTarget.value as IntervalUnit;
+    setDraft((current) => ({
+      ...current,
+      schedule: {
+        ...current.schedule,
+        intervalUnit,
+        interval: Math.min(current.schedule.interval, maxInterval(intervalUnit))
+      }
+    }));
+  };
+
+  const onChangeInterval: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
+    setDraft((current) => ({
+      ...current,
+      schedule: {
+        ...current.schedule,
+        interval: event.currentTarget.valueAsNumber
+      }
+    }));
+  };
+
+  const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    if (!saveSchedule()) return;
+    saveTitle();
+    saveDetails();
+    props.onBack();
+  };
+
+  const onClickDelete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    void deleteRepeatingTask(props.session.user.userId, props.repeatingTaskId).catch(() => {
+      props.showNotice("Could not delete repeating task. Try again later.");
+    });
+    props.onBack();
+  };
+
+  function saveTitle() {
+    if (draft().title !== initialRepeatingTask.title) {
+      void setRepeatingTaskTitle(props.session.user.userId, props.repeatingTaskId, draft().title).catch(() => {
+        props.showNotice("Could not save repeating task. Try again later.");
+      });
+    }
+  }
+
+  function saveDetails() {
+    if (draft().details !== initialRepeatingTask.details) {
+      void setRepeatingTaskDetails(props.session.user.userId, props.repeatingTaskId, draft().details).catch(() => {
+        props.showNotice("Could not save repeating task. Try again later.");
+      });
+    }
+  }
+
+  // Validate and save schedule changes. Return false if the schedule is invalid.
+  function saveSchedule() {
+    const { nextDate, interval, intervalUnit, anchorDate } = draft().schedule;
+
+    const nextDateChanged = nextDate !== initialRepeatingTask.schedule.nextDate;
+    const intervalUnitChanged = intervalUnit !== initialRepeatingTask.schedule.intervalUnit;
+    const intervalChanged = interval !== initialRepeatingTask.schedule.interval;
+    const scheduleChanged = nextDateChanged || intervalUnitChanged || intervalChanged;
+    if (!scheduleChanged) return true;
+
+    let validatedNextDate: TaskDate;
+    try {
+      validatedNextDate = decodeTaskDate(nextDate);
+    } catch {
+      props.showNotice("A next date is required.");
+      return false;
+    }
+    if (validatedNextDate > taskDateOneYearFromToday()) {
+      props.showNotice("The next date cannot be more than 1 year in the future.");
+      return false;
+    }
+    if (!Number.isInteger(interval) || interval < 1 || interval > maxInterval(intervalUnit)) {
+      props.showNotice(`The interval must be a number from 1 to ${maxInterval(intervalUnit)}.`);
+      return false;
+    }
+
+    const schedule: Schedule = {
+      nextDate: validatedNextDate,
+      interval,
+      intervalUnit,
+      anchorDate: nextDateChanged || intervalUnitChanged ? validatedNextDate : anchorDate,
+    };
+    void setRepeatingTaskSchedule(props.session.user.userId, props.repeatingTaskId, schedule).catch(() => {
+      props.showNotice("Could not save repeating task. Try again later.");
+    });
+    return true;
+  }
+
+  return (
+    <main>
+      <button type="button" onClick={onClickBack}>
+        Back
+      </button>
+      <input
+        name="title"
+        type="text"
+        value={draft().title}
+        onInput={onChangeTitle}
+      />
+      <textarea
+        name="details"
+        value={draft().details}
+        onInput={onChangeDetails}
+      />
+      <input
+        name="nextDate"
+        type="date"
+        max={taskDateOneYearFromToday()}
+        value={draft().schedule.nextDate}
+        onInput={onChangeNextDate}
+      />
+      <input
+        name="interval"
+        type="number"
+        min="1"
+        max={maxInterval(draft().schedule.intervalUnit)}
+        value={draft().schedule.interval}
+        onInput={onChangeInterval}
+      />
+      <select
+        name="intervalUnit"
+        value={draft().schedule.intervalUnit}
+        onChange={onChangeIntervalUnit}
+      >
+        <option value="Days">Days</option>
+        <option value="Weeks">Weeks</option>
+        <option value="Months">Months</option>
+        <option value="Years">Years</option>
+      </select>
+      <button type="button" onClick={onClickDelete}>
+        Delete
+      </button>
+    </main>
+  );
+}

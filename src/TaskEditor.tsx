@@ -24,7 +24,7 @@ export default function TaskEditor(props: {
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
-  // Capture the task when the editor opens so unmodified fields don't overwrite remote edits
+  // Capture the task when the editor opens so unmodified fields don't overwrite remote edits.
   const initialTask = props.task;
   const [draft, setDraft] = createSignal<TaskDraft>(initialTask);
 
@@ -96,6 +96,7 @@ export default function TaskEditor(props: {
     }
   }
 
+  // Validate and save date changes for an incomplete task. Return false if the date is invalid.
   function saveDate() {
     const date = draft().date;
     if (props.task.completedAt === null && date !== initialTask.date) {

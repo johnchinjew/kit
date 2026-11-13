@@ -5,13 +5,31 @@ import {
   onSnapshot,
   setDoc,
   Timestamp,
+  type DocumentData,
   type DocumentReference,
   type DocumentSnapshot,
   type Firestore,
 } from "firebase/firestore";
+import { nextOccurrenceDate } from "../src/repeatingTask";
 import { decodeTaskDate, taskDateToday } from "../src/taskDate";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { completeTask, createTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle, subscribeUserData } from "../src/userData";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  completeTask,
+  createRepeatingTask,
+  createTasksFromRepeatingTasks,
+  createTask,
+  deleteRepeatingTask,
+  deleteTask,
+  reopenTask,
+  setRepeatingTaskSchedule,
+  setRepeatingTaskDetails,
+  setRepeatingTaskTitle,
+  setTaskDate,
+  setTaskDetails,
+  setTaskTitle,
+  subscribeUserData,
+  type UserData,
+} from "../src/userData";
 
 vi.mock("firebase/firestore", async (importOriginal) => ({
   ...await importOriginal<typeof import("firebase/firestore")>(),
@@ -38,13 +56,15 @@ describe("User data: task creation", () => {
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "CreateTask", taskId: "first" },
-      tasks: { first: {
-        title: "", details: "", completed: false, date: taskDateToday(),
-        titleEditedAt: expect.any(Timestamp),
-        detailsEditedAt: expect.any(Timestamp),
-        dateEditedAt: expect.any(Timestamp),
-        completedEditedAt: expect.any(Timestamp),
-      } },
+      tasks: {
+        first: {
+          title: "", details: "", completed: false, date: taskDateToday(),
+          titleEditedAt: expect.any(Timestamp),
+          detailsEditedAt: expect.any(Timestamp),
+          dateEditedAt: expect.any(Timestamp),
+          completedEditedAt: expect.any(Timestamp),
+        }
+      },
     }, { merge: true });
   });
 
@@ -54,18 +74,26 @@ describe("User data: task creation", () => {
     try {
       await createTask("alice", "first");
       const created = vi.mocked(setDoc).mock.calls[0]![1];
-      expect(created).toMatchObject({ tasks: { first: {
-        titleEditedAt: Timestamp.fromMillis(now),
-        detailsEditedAt: Timestamp.fromMillis(now),
-        dateEditedAt: Timestamp.fromMillis(now),
-        completedEditedAt: Timestamp.fromMillis(now),
-      } } });
+      expect(created).toMatchObject({
+        tasks: {
+          first: {
+            titleEditedAt: Timestamp.fromMillis(now),
+            detailsEditedAt: Timestamp.fromMillis(now),
+            dateEditedAt: Timestamp.fromMillis(now),
+            completedEditedAt: Timestamp.fromMillis(now),
+          }
+        }
+      });
 
       clock.mockReturnValue(now + 1_000);
       await setTaskTitle("alice", "first", "Bread");
-      expect(vi.mocked(setDoc).mock.calls[1]![1]).toMatchObject({ tasks: { first: {
-        titleEditedAt: Timestamp.fromMillis(now + 1_000),
-      } } });
+      expect(vi.mocked(setDoc).mock.calls[1]![1]).toMatchObject({
+        tasks: {
+          first: {
+            titleEditedAt: Timestamp.fromMillis(now + 1_000),
+          }
+        }
+      });
     } finally {
       clock.mockRestore();
     }
@@ -110,6 +138,89 @@ describe("User data: task deletion", () => {
   });
 });
 
+describe("User data: repeating task operations", () => {
+  const firestore = {} as Firestore;
+  const userDocument = {} as DocumentReference;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getFirestore).mockReturnValue(firestore);
+    vi.mocked(doc).mockReturnValue(userDocument);
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+  });
+
+  it("creates a repeating task as its own resource", async () => {
+    await createRepeatingTask("alice", "repeating.task.with.dots");
+    expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
+      operation: { type: "CreateRepeatingTask", repeatingTaskId: "repeating.task.with.dots" },
+      repeatingTasks: {
+        "repeating.task.with.dots": {
+          title: "", details: "", schedule: { nextDate: taskDateToday(), interval: 1, intervalUnit: "Days", anchorDate: taskDateToday() },
+          titleEditedAt: expect.any(Timestamp),
+          detailsEditedAt: expect.any(Timestamp),
+          scheduleEditedAt: expect.any(Timestamp),
+        }
+      },
+    }, { merge: true });
+  });
+
+  it("writes repeating task title, details, and schedule as separate operations", async () => {
+    const schedule = {
+      nextDate: decodeTaskDate("2026-01-31"), interval: 1, intervalUnit: "Months" as const, anchorDate: decodeTaskDate("2026-01-31"),
+    };
+    await setRepeatingTaskTitle("alice", "repeating-task", "Rent");
+    await setRepeatingTaskDetails("alice", "repeating-task", "Pay landlord");
+    await setRepeatingTaskSchedule("alice", "repeating-task", schedule);
+    await deleteRepeatingTask("alice", "repeating-task");
+    expect(setDoc).toHaveBeenNthCalledWith(1, userDocument, {
+      operation: { type: "SetRepeatingTaskTitle", repeatingTaskId: "repeating-task" },
+      repeatingTasks: { "repeating-task": { title: "Rent", titleEditedAt: expect.any(Timestamp) } },
+    }, { merge: true });
+    expect(setDoc).toHaveBeenNthCalledWith(2, userDocument, {
+      operation: { type: "SetRepeatingTaskDetails", repeatingTaskId: "repeating-task" },
+      repeatingTasks: { "repeating-task": { details: "Pay landlord", detailsEditedAt: expect.any(Timestamp) } },
+    }, { merge: true });
+    expect(setDoc).toHaveBeenNthCalledWith(3, userDocument, {
+      operation: { type: "SetRepeatingTaskSchedule", repeatingTaskId: "repeating-task" },
+      repeatingTasks: { "repeating-task": { schedule, scheduleEditedAt: expect.any(Timestamp) } },
+    }, { merge: true });
+    expect(setDoc).toHaveBeenNthCalledWith(4, userDocument, {
+      operation: { type: "DeleteRepeatingTask", repeatingTaskId: "repeating-task" },
+      repeatingTasks: { "repeating-task": deleteField() },
+    }, { merge: true });
+  });
+
+  it("creates a task for an occurrence with its own ID and advances the repeating task separately", async () => {
+    const schedule = {
+      nextDate: taskDateToday(), interval: 1, intervalUnit: "Months" as const, anchorDate: taskDateToday(),
+    };
+    const repeatingTask = {
+      title: "Rent", details: "Pay landlord", schedule, scheduleEditedAt: Timestamp.fromMillis(1000),
+    };
+    await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { "repeating.task.with.dots": repeatingTask } });
+    const taskId = (vi.mocked(setDoc).mock.calls[0]![1] as DocumentData).operation.taskId as string;
+    expect(taskId).toEqual(expect.any(String));
+    expect(setDoc).toHaveBeenCalledTimes(2);
+    expect(setDoc).toHaveBeenNthCalledWith(1, userDocument, {
+      operation: { type: "CreateTask", taskId },
+      tasks: {
+        [taskId]: {
+          title: "Rent", details: "Pay landlord", completed: false, date: taskDateToday(),
+          titleEditedAt: expect.any(Timestamp), detailsEditedAt: expect.any(Timestamp),
+          completedEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
+        }
+      },
+    }, { merge: true });
+    expect(setDoc).toHaveBeenNthCalledWith(2, userDocument, {
+      operation: {
+        type: "AdvanceRepeatingTask", repeatingTaskId: "repeating.task.with.dots", createdTaskId: taskId,
+        scheduleEditedAt: repeatingTask.scheduleEditedAt,
+      },
+      repeatingTasks: { "repeating.task.with.dots": { schedule: { nextDate: nextOccurrenceDate(schedule) } } },
+    }, { merge: true });
+  });
+});
+
 describe("User data: task title editing", () => {
   const firestore = {} as Firestore;
   const userDocument = {} as DocumentReference;
@@ -127,10 +238,12 @@ describe("User data: task title editing", () => {
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "SetTaskTitle", taskId: "task.with.dots" },
-      tasks: { "task.with.dots": {
-        title: "Buy bread",
-        titleEditedAt: expect.any(Timestamp),
-      } },
+      tasks: {
+        "task.with.dots": {
+          title: "Buy bread",
+          titleEditedAt: expect.any(Timestamp),
+        }
+      },
     }, { merge: true });
   });
 
@@ -186,10 +299,12 @@ describe("User data: task date editing", () => {
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "SetTaskDate", taskId: "task.with.dots" },
-      tasks: { "task.with.dots": {
-        date: "2026-10-04",
-        dateEditedAt: expect.any(Timestamp),
-      } },
+      tasks: {
+        "task.with.dots": {
+          date: "2026-10-04",
+          dateEditedAt: expect.any(Timestamp),
+        }
+      },
     }, { merge: true });
   });
 
@@ -217,10 +332,12 @@ describe("User data: task completion", () => {
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "CompleteTask", taskId: "task.with.dots" },
-      tasks: { "task.with.dots": {
-        completed: true,
-        completedEditedAt: expect.any(Timestamp),
-      } },
+      tasks: {
+        "task.with.dots": {
+          completed: true,
+          completedEditedAt: expect.any(Timestamp),
+        }
+      },
     }, { merge: true });
   });
 
@@ -250,10 +367,12 @@ describe("User data: task reopening", () => {
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "ReopenTask", taskId: "task.with.dots" },
-      tasks: { "task.with.dots": {
-        completed: false,
-        completedEditedAt: expect.any(Timestamp),
-      } },
+      tasks: {
+        "task.with.dots": {
+          completed: false,
+          completedEditedAt: expect.any(Timestamp),
+        }
+      },
     }, { merge: true });
   });
 
@@ -311,13 +430,13 @@ describe("User data: subscription", () => {
       tasks: {
         first: { title: "Buy milk", details: "Whole milk", completedAt: null, date: "2026-10-04" },
         second: { title: "Walk dog", details: "", completedAt: null, date: "2026-10-04" },
-      }
+      }, repeatingTasks: {},
     });
 
     receive({
       data: () => ({ tasks: { second: { title: "Walk dog again", details: "", completed: false, date: "2026-10-04" } } }),
     } as unknown as DocumentSnapshot);
-    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", details: "", completedAt: null, date: "2026-10-04" } } });
+    expect(onUserData).toHaveBeenLastCalledWith({ tasks: { second: { title: "Walk dog again", details: "", completedAt: null, date: "2026-10-04" } }, repeatingTasks: {} });
   });
 
   it("reads incomplete and completed tasks", () => {
@@ -329,16 +448,49 @@ describe("User data: subscription", () => {
       (snapshot: DocumentSnapshot) => void;
 
     receive({
-      data: () => ({ tasks: {
-        incomplete: { title: "Walk dog", details: "", completed: false, date: "2026-10-04" },
-        completed: { title: "Buy bread", details: "", completed: true, date: "2026-10-04", completedEditedAt: completedAt },
-      } }),
+      data: () => ({
+        tasks: {
+          incomplete: { title: "Walk dog", details: "", completed: false, date: "2026-10-04" },
+          completed: { title: "Buy bread", details: "", completed: true, date: "2026-10-04", completedEditedAt: completedAt },
+        }
+      }),
     } as unknown as DocumentSnapshot);
 
-    expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {
-      incomplete: { title: "Walk dog", details: "", completedAt: null, date: "2026-10-04" },
-      completed: { title: "Buy bread", details: "", date: "2026-10-04", completedAt },
-    } });
+    expect(onUserData).toHaveBeenCalledExactlyOnceWith({
+      tasks: {
+        incomplete: { title: "Walk dog", details: "", completedAt: null, date: "2026-10-04" },
+        completed: { title: "Buy bread", details: "", date: "2026-10-04", completedAt },
+      }, repeatingTasks: {}
+    });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("decodes repeating tasks independently from tasks", () => {
+    const scheduleEditedAt = Timestamp.fromMillis(1000);
+    const onUserData = vi.fn();
+    const onError = vi.fn();
+    subscribeUserData("alice", onUserData, onError);
+    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      (snapshot: DocumentSnapshot) => void;
+    receive({
+      data: () => ({
+        repeatingTasks: {
+          rent: {
+            title: "Rent", details: "Pay landlord",
+            schedule: { nextDate: "2026-01-31", interval: 1, intervalUnit: "Months", anchorDate: "2026-01-31" }, scheduleEditedAt,
+          }
+        }
+      })
+    } as unknown as DocumentSnapshot);
+
+    expect(onUserData).toHaveBeenCalledExactlyOnceWith({
+      tasks: {}, repeatingTasks: {
+        rent: {
+          title: "Rent", details: "Pay landlord",
+          schedule: { nextDate: "2026-01-31", interval: 1, intervalUnit: "Months", anchorDate: "2026-01-31" }, scheduleEditedAt,
+        }
+      }
+    });
     expect(onError).not.toHaveBeenCalled();
   });
 
@@ -355,10 +507,14 @@ describe("User data: subscription", () => {
         completedEditedAt: Timestamp.fromMillis(milliseconds),
       };
       receive({ data: () => ({ tasks: { first: task } }) } as unknown as DocumentSnapshot);
-      expect(onUserData).toHaveBeenLastCalledWith({ tasks: { first: {
-        title: "Buy bread", details: "", date: "2026-10-04",
-        completedAt: completed ? Timestamp.fromMillis(milliseconds) : null,
-      } } });
+      expect(onUserData).toHaveBeenLastCalledWith({
+        tasks: {
+          first: {
+            title: "Buy bread", details: "", date: "2026-10-04",
+            completedAt: completed ? Timestamp.fromMillis(milliseconds) : null,
+          }
+        }, repeatingTasks: {}
+      });
     }
     expect(onError).not.toHaveBeenCalled();
   });
@@ -368,9 +524,15 @@ describe("User data: subscription", () => {
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
     const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as (snapshot: DocumentSnapshot) => void;
-    receive({ data: () => ({ tasks: { first: {
-      title: "Bread", details, completed: false, date: "2026-10-04",
-    } } }) } as unknown as DocumentSnapshot);
+    receive({
+      data: () => ({
+        tasks: {
+          first: {
+            title: "Bread", details, completed: false, date: "2026-10-04",
+          }
+        }
+      })
+    } as unknown as DocumentSnapshot);
     expect(onUserData).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledExactlyOnceWith(new Error("Invalid task first"));
   });
@@ -384,9 +546,15 @@ describe("User data: subscription", () => {
       const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
         (snapshot: DocumentSnapshot) => void;
 
-      receive({ data: () => ({ tasks: { first: {
-        title: "Buy bread", details: "", completed: true, date: "2026-10-04", completedEditedAt,
-      } } }) } as unknown as DocumentSnapshot);
+      receive({
+        data: () => ({
+          tasks: {
+            first: {
+              title: "Buy bread", details: "", completed: true, date: "2026-10-04", completedEditedAt,
+            }
+          }
+        })
+      } as unknown as DocumentSnapshot);
 
       expect(onUserData).not.toHaveBeenCalled();
       expect(onError).toHaveBeenCalledExactlyOnceWith(new Error("Invalid task first: invalid completion timestamp"));
@@ -400,9 +568,15 @@ describe("User data: subscription", () => {
     const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
-    receive({ data: () => ({ tasks: { first: {
-      title: "Buy bread", details: "", completed: true, date: "2026-10-04",
-    } } }) } as unknown as DocumentSnapshot);
+    receive({
+      data: () => ({
+        tasks: {
+          first: {
+            title: "Buy bread", details: "", completed: true, date: "2026-10-04",
+          }
+        }
+      })
+    } as unknown as DocumentSnapshot);
 
     expect(onUserData).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledExactlyOnceWith(new Error("Invalid task first: invalid completion timestamp"));
@@ -419,12 +593,12 @@ describe("User data: subscription", () => {
 
       receive({ data: () => data } as unknown as DocumentSnapshot);
 
-      expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {} });
+      expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {}, repeatingTasks: {} });
       expect(onError).not.toHaveBeenCalled();
     },
   );
 
-  it.each([null, [], 42, { tasks: null }, { tasks: [] }, { tasks: 42 }, { tasks: undefined }])(
+  it.each([null, [], 42, { tasks: null }, { tasks: [] }, { tasks: 42 }, { tasks: undefined }, { repeatingTasks: null }, { repeatingTasks: [] }])(
     "reports malformed data without publishing an empty replacement: %j",
     (data) => {
       const onUserData = vi.fn();
@@ -440,48 +614,51 @@ describe("User data: subscription", () => {
     },
   );
 
-  it.each([{}, { title: 42, details: "", completed: false, date: "2026-10-04" }, { title: "Buy milk", details: "", date: "2026-10-04" },
+  it.each([
     { title: "Buy milk", details: "", completed: false },
     { title: "Buy milk", details: "", completed: false, date: undefined },
-    { title: "Buy milk", details: "", completed: "true", date: "2026-10-04" },
-    { title: "Buy milk", details: "", completed: null, date: "2026-10-04" }, { title: "Buy milk", details: "", completed: undefined, date: "2026-10-04" },
     { title: "Buy milk", details: "", completed: false, date: null },
     { title: "Buy milk", details: "", completed: false, date: 42 },
+    {}, { title: 42, details: "", completed: false, date: "2026-10-04" }, { title: "Buy milk", details: "", date: "2026-10-04" },
+    { title: "Buy milk", details: "", completed: "true", date: "2026-10-04" },
+    { title: "Buy milk", details: "", completed: null, date: "2026-10-04" }, { title: "Buy milk", details: "", completed: undefined, date: "2026-10-04" },
     null, Object.assign([], { title: "Invalid array" })])(
-    "rejects a malformed task and resumes publishing when data becomes readable: %j",
-    (task) => {
-      const onUserData = vi.fn();
-      const onError = vi.fn();
-      subscribeUserData("alice", onUserData, onError);
-      const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
-        (snapshot: DocumentSnapshot) => void;
-      const valid = { tasks: { valid: { title: "Buy milk", details: "", completed: false, date: "2026-10-04" } } };
+      "rejects a malformed task and resumes publishing when data becomes readable: %j",
+      (task) => {
+        const onUserData = vi.fn();
+        const onError = vi.fn();
+        subscribeUserData("alice", onUserData, onError);
+        const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+          (snapshot: DocumentSnapshot) => void;
+        const valid = { tasks: { valid: { title: "Buy milk", details: "", completed: false, date: "2026-10-04" } } };
 
-      receive({ data: () => valid } as unknown as DocumentSnapshot);
-      receive({
-        data: () => ({
+        receive({ data: () => valid } as unknown as DocumentSnapshot);
+        receive({
+          data: () => ({
+            tasks: {
+              valid: { title: "Changed title", details: "", completed: false, date: "2026-10-04" },
+              malformed: task,
+            }
+          })
+        } as unknown as DocumentSnapshot);
+
+        expect(onUserData).toHaveBeenCalledExactlyOnceWith({
           tasks: {
-            valid: { title: "Changed title", details: "", completed: false, date: "2026-10-04" },
-            malformed: task,
-          }
-        })
-      } as unknown as DocumentSnapshot);
+            valid: { title: "Buy milk", details: "", date: "2026-10-04", completedAt: null },
+          }, repeatingTasks: {}
+        });
+        expect(onError).toHaveBeenCalledExactlyOnceWith(new Error(
+          "Invalid task malformed",
+        ));
 
-      expect(onUserData).toHaveBeenCalledExactlyOnceWith({ tasks: {
-        valid: { title: "Buy milk", details: "", date: "2026-10-04", completedAt: null },
-      } });
-      expect(onError).toHaveBeenCalledExactlyOnceWith(new Error(
-        "Invalid task malformed",
-      ));
+        receive({ data: () => ({ tasks: {} }) } as unknown as DocumentSnapshot);
 
-      receive({ data: () => ({ tasks: {} }) } as unknown as DocumentSnapshot);
-
-      expect(onUserData).toHaveBeenCalledTimes(2);
-      expect(onUserData).toHaveBeenLastCalledWith({ tasks: {} });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(setDoc).not.toHaveBeenCalled();
-    },
-  );
+        expect(onUserData).toHaveBeenCalledTimes(2);
+        expect(onUserData).toHaveBeenLastCalledWith({ tasks: {}, repeatingTasks: {} });
+        expect(onError).toHaveBeenCalledTimes(1);
+        expect(setDoc).not.toHaveBeenCalled();
+      },
+    );
 
   it.each(["2026-02-30", "10/04/2026", ""])("reports the task ID and date requirement for invalid date %j", (date) => {
     const onUserData = vi.fn();
@@ -510,5 +687,141 @@ describe("User data: subscription", () => {
 
     expect(() => receive({ data: () => ({}) } as DocumentSnapshot)).toThrow(error);
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  function decodeRepeatingTaskForTest(data: unknown) {
+    const onUserData = vi.fn();
+    const onError = vi.fn();
+    subscribeUserData("alice", onUserData, onError);
+    const receive = vi.mocked(onSnapshot).mock.lastCall![1] as (snapshot: DocumentSnapshot) => void;
+    receive({ data: () => ({ repeatingTasks: { test: data } }) } as unknown as DocumentSnapshot);
+    if (onError.mock.calls.length) throw onError.mock.calls[0]![0];
+    return onUserData.mock.calls[0]![0].repeatingTasks.test;
+  }
+
+  const validRepeatingTask = {
+    title: "",
+    details: "",
+    schedule: {
+      nextDate: "2026-01-01",
+      interval: 1,
+      intervalUnit: "Days",
+      anchorDate: "2026-01-01",
+    },
+    scheduleEditedAt: Timestamp.fromMillis(0),
+  };
+
+  it.each([
+    [{ schedule: undefined }, "Invalid schedule: not a record"],
+    [{ schedule: [] }, "Invalid schedule: not a record"],
+    [{ scheduleEditedAt: undefined }, "Invalid repeating task test: invalid schedule timestamp"],
+    [{ scheduleEditedAt: { seconds: 1, nanoseconds: 0 } }, "Invalid repeating task test: invalid schedule timestamp"],
+    [{ schedule: { ...validRepeatingTask.schedule, nextDate: undefined } }, "Invalid schedule: invalid next date"],
+    [{ schedule: { ...validRepeatingTask.schedule, nextDate: "2026-02-30" } }, "Invalid schedule: invalid next date"],
+    [{ schedule: { ...validRepeatingTask.schedule, anchorDate: null } }, "Invalid schedule: invalid anchor date"],
+  ])("rejects invalid repeating task fields: %j", (patch, message) => {
+    expect(() => decodeRepeatingTaskForTest({ ...validRepeatingTask, ...patch })).toThrow(message);
+  });
+
+  it.each([["Days", 366], ["Weeks", 53], ["Months", 13], ["Years", 2], ["Days", 0], ["Days", 1.5], ["Days", -1]])(
+    "rejects an invalid interval %s %s", (intervalUnit, interval) => {
+      expect(() => decodeRepeatingTaskForTest({ ...validRepeatingTask, schedule: { ...validRepeatingTask.schedule, intervalUnit, interval } })).toThrow();
+    },
+  );
+
+  it.each(["Days", "Weeks", "Months", "Years"])("decodes valid interval units: %s", (intervalUnit) => {
+    const repeatingTask = { ...validRepeatingTask, schedule: { ...validRepeatingTask.schedule, intervalUnit } };
+    expect(decodeRepeatingTaskForTest(repeatingTask)).toEqual(repeatingTask);
+    expect(() => decodeRepeatingTaskForTest({ ...repeatingTask, schedule: { ...repeatingTask.schedule, intervalUnit: intervalUnit.toLowerCase() } }))
+      .toThrow("Invalid schedule: invalid unit");
+  });
+
+  it("rejects unknown units and invalid dates", () => {
+    expect(() => decodeRepeatingTaskForTest({ ...validRepeatingTask, schedule: { ...validRepeatingTask.schedule, intervalUnit: "fortnights" } }))
+      .toThrow("Invalid schedule: invalid unit");
+    expect(() => decodeRepeatingTaskForTest({ ...validRepeatingTask, schedule: { ...validRepeatingTask.schedule, anchorDate: "2026-02-29" } }))
+      .toThrow("Invalid schedule: invalid anchor date");
+  });
+});
+
+describe("User data: tasks from repeating tasks", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 31, 12));
+    vi.mocked(setDoc).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("creates all due occurrences through today and preserves the monthly anchor", async () => {
+    const repeatingTask = {
+      title: "Rent", details: "Pay landlord",
+      schedule: {
+        nextDate: decodeTaskDate("2026-01-31"), interval: 1, intervalUnit: "Months" as const, anchorDate: decodeTaskDate("2026-01-31"),
+      },
+      scheduleEditedAt: Timestamp.now(),
+    };
+
+    await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } });
+
+    expect(setDoc).toHaveBeenCalledTimes(6);
+    const taskIds = new Set<string>();
+    for (const [index, date] of ["2026-01-31", "2026-02-28", "2026-03-31"].entries()) {
+      const creation = vi.mocked(setDoc).mock.calls[index * 2]![1] as DocumentData;
+      const advancement = vi.mocked(setDoc).mock.calls[index * 2 + 1]![1];
+      const taskId = creation.operation.taskId as string;
+      taskIds.add(taskId);
+      expect(creation).toMatchObject({
+        operation: { type: "CreateTask", taskId },
+        tasks: { [taskId]: { title: "Rent", details: "Pay landlord", date, completed: false } },
+      });
+      expect(advancement).toEqual({
+        operation: { type: "AdvanceRepeatingTask", repeatingTaskId: "rent", createdTaskId: taskId, scheduleEditedAt: repeatingTask.scheduleEditedAt },
+        repeatingTasks: { rent: { schedule: { nextDate: ["2026-02-28", "2026-03-31", "2026-04-30"][index] } } },
+      });
+    }
+    expect(taskIds.size).toBe(3);
+    expect(repeatingTask.schedule.nextDate).toBe("2026-01-31");
+  });
+
+  it("queues all occurrences and advancements before server acknowledgement", async () => {
+    let finishCreation!: () => void;
+    let finishAdvancement!: () => void;
+    const creation = new Promise<void>((resolve) => { finishCreation = resolve; });
+    const advancement = new Promise<void>((resolve) => { finishAdvancement = resolve; });
+    vi.mocked(setDoc).mockReturnValueOnce(creation).mockReturnValueOnce(advancement);
+    const processing = createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { walk: {
+      title: "Walk", details: "",
+      schedule: {
+        nextDate: decodeTaskDate("2026-03-30"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-03-30"),
+      },
+      scheduleEditedAt: Timestamp.now(),
+    } } });
+
+    expect(setDoc).toHaveBeenCalledTimes(4);
+    finishCreation();
+    finishAdvancement();
+    await processing;
+    expect(vi.mocked(setDoc).mock.calls.map(([, data]) => (data as DocumentData).operation.type)).toEqual([
+      "CreateTask", "AdvanceRepeatingTask", "CreateTask", "AdvanceRepeatingTask",
+    ]);
+  });
+
+  it.each(["creation", "advancement"])("reports a %s failure after queuing all writes", async (failure) => {
+    const data: UserData = { tasks: {}, repeatingTasks: { walk: {
+      title: "Walk", details: "",
+      schedule: {
+        nextDate: decodeTaskDate("2026-03-29"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-03-29"),
+      },
+      scheduleEditedAt: Timestamp.now(),
+    } } };
+    const error = new Error("Write rejected");
+    if (failure === "advancement") vi.mocked(setDoc).mockResolvedValueOnce(undefined);
+    vi.mocked(setDoc).mockRejectedValueOnce(error);
+
+    await expect(createTasksFromRepeatingTasks("alice", data)).rejects.toBe(error);
+
+    expect(setDoc).toHaveBeenCalledTimes(6);
   });
 });

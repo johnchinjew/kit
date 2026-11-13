@@ -1,4 +1,6 @@
 import "fake-indexeddb/auto";
+import { readFile } from "node:fs/promises";
+import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import { deleteApp, getApp, initializeApp } from "firebase/app";
 import {
   connectFirestoreEmulator,
@@ -10,12 +12,13 @@ import {
   getFirestore,
   initializeFirestore,
   terminate,
+  setDoc,
   Timestamp,
   waitForPendingWrites,
 } from "firebase/firestore";
-import { decodeTaskDate, taskDateToday } from "../src/taskDate";
+import { decodeTaskDate, taskDateToday, taskDateFromUtcDate, utcDateFromTaskDate } from "../src/taskDate";
 import { expect, it, vi } from "vitest";
-import { completeTask, createTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
+import { completeTask, createTask, createTasksFromRepeatingTasks, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
 
 vi.mock("../src/App", () => ({ default: () => null }));
 vi.mock("solid-js/web", () => ({ render: vi.fn() }));
@@ -126,6 +129,77 @@ it("retains offline task creation, title, details, and date editing, completion,
     clock.mockRestore();
     await terminate(firestore);
     await deleteApp(app);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }
+}, 20_000);
+
+it("catches up offline and does not duplicate occurrences after an offline restart", async () => {
+  const storage = new Map<string, string>();
+  vi.stubGlobal("window", {
+    localStorage: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+      key: (index: number) => [...storage.keys()][index] ?? null,
+      get length() { return storage.size; },
+    },
+    addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  });
+  vi.stubEnv("USE_MOCK_PERSISTENCE", "YES");
+  const { persistentLocalCache, persistentMultipleTabManager } = await import("firebase/firestore");
+  const environment = await initializeTestEnvironment({
+    projectId: "demo-kit-offline-recurrence",
+    firestore: { rules: await readFile(new URL("../firestore.rules", import.meta.url), "utf8") },
+  });
+  const options = { projectId: "demo-kit-offline-recurrence", apiKey: "test", appId: "offline-recurrence" };
+  const settings = { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
+  let app = initializeApp(options);
+  let firestore = initializeFirestore(app, settings);
+  try {
+    connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-recurrence" } });
+    const today = taskDateToday();
+    const date = utcDateFromTaskDate(today);
+    date.setUTCDate(date.getUTCDate() - 2);
+    const firstDate = taskDateFromUtcDate(date);
+    const editedAt = Timestamp.now();
+    const repeatingTask = {
+      title: "Walk", details: "",
+      schedule: { nextDate: firstDate, interval: 1, intervalUnit: "Days" as const, anchorDate: firstDate },
+      scheduleEditedAt: editedAt, titleEditedAt: editedAt, detailsEditedAt: editedAt,
+    };
+    await setDoc(doc(firestore, "users", "offline-recurrence"), {
+      operation: { type: "CreateRepeatingTask", repeatingTaskId: "walk" },
+      repeatingTasks: { walk: repeatingTask },
+    }, { merge: true });
+    await disableNetwork(firestore);
+    void createTasksFromRepeatingTasks("offline-recurrence", { tasks: {}, repeatingTasks: { walk: repeatingTask } }).catch(() => {});
+    const cached = (await getDocFromCache(doc(firestore, "users", "offline-recurrence"))).data()!;
+    expect(Object.values(cached.tasks).map((task) => (task as { date: string }).date).sort()).toEqual([
+      firstDate, taskDateFromUtcDate(new Date(date.getTime() + 86_400_000)), today,
+    ]);
+    const tomorrow = taskDateFromUtcDate(new Date(utcDateFromTaskDate(today).getTime() + 86_400_000));
+    expect(cached.repeatingTasks.walk.schedule.nextDate).toBe(tomorrow);
+
+    await terminate(firestore);
+    await deleteApp(app);
+    app = initializeApp(options);
+    firestore = initializeFirestore(app, settings);
+    connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-recurrence" } });
+    await disableNetwork(firestore);
+    const reference = doc(firestore, "users", "offline-recurrence");
+    const restarted = await getDocFromCache(reference);
+    expect(restarted.data()).toEqual(cached);
+    expect(restarted.metadata.hasPendingWrites).toBe(true);
+    await createTasksFromRepeatingTasks("offline-recurrence", { tasks: {}, repeatingTasks: restarted.data()!.repeatingTasks });
+    expect((await getDocFromCache(reference)).data()).toEqual(cached);
+    await enableNetwork(firestore);
+    await waitForPendingWrites(firestore);
+    expect((await getDocFromServer(reference)).data()).toEqual(cached);
+  } finally {
+    await terminate(firestore);
+    await deleteApp(app);
+    await environment.cleanup();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   }

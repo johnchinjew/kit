@@ -254,32 +254,6 @@ describe("Firestore security rules", () => {
   });
 
   it.each([
-    ["CompleteTask", false],
-    ["ReopenTask", true],
-    ["CompleteTask", deleteField()],
-  ])("leaves completion values to the client for %s", async (type, completed) => {
-    const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
-    await assertSucceeds(setDoc(reference, {
-      operation: { type, taskId: "task.with.dots" },
-      tasks: { "task.with.dots": { completed, completedEditedAt: editTime } },
-    }, { merge: true }));
-  });
-
-  it.each([
-    { title: deleteField() },
-    { completed: true },
-    { futureField: 43 },
-    { futureField: deleteField() },
-    { dateEditedAt: editTime },
-  ])("trusts clients to scope task field changes: %j", async (patch) => {
-    const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
-    await assertSucceeds(setDoc(reference, {
-      operation: { type: "SetTaskTitle", taskId: "task.with.dots" },
-      tasks: { "task.with.dots": { title: "Bread", titleEditedAt: editTime, ...patch } },
-    }, { merge: true }));
-  });
-
-  it.each([
     { tasks: { "task.with.dots": { title: "Bread", titleEditedAt: editTime }, other: deleteField() } },
     { tasks: { "task.with.dots": { title: "Bread", titleEditedAt: editTime }, other: { title: "Other task" } } },
     { futureField: false },
@@ -347,22 +321,6 @@ describe("Firestore security rules", () => {
     }, { merge: true }));
   });
 
-  it("allows owner-written task data without validating domain fields", async () => {
-    const taskId = crypto.randomUUID();
-    const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
-    await assertSucceeds(setDoc(reference, { operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
-      title: 42, completed: "invalid", date: null, extra: true,
-      titleEditedAt: oldTime, detailsEditedAt: oldTime, dateEditedAt: oldTime, completedEditedAt: oldTime,
-    } } }, { merge: true }));
-    await assertSucceeds(setDoc(reference, { operation: { type: "SetTaskTitle", taskId },
-      tasks: { [taskId]: { title: false, titleEditedAt: editTime } } }, { merge: true }));
-    await assertSucceeds(setDoc(reference, { operation: { type: "CompleteTask", taskId },
-      tasks: { [taskId]: { completed: true, completedEditedAt: editTime } } }, { merge: true }));
-    expect((await getDoc(reference)).data()!.tasks[taskId]).toMatchObject({
-      title: false, completed: true, date: null, extra: true,
-    });
-  });
-
   it.each([
     { titleEditedAt: "bad" }, { titleEditedAt: deleteField() },
     { detailsEditedAt: "bad" }, { detailsEditedAt: deleteField() },
@@ -379,4 +337,112 @@ describe("Firestore security rules", () => {
       titleEditedAt: editTime, detailsEditedAt: editTime, dateEditedAt: editTime, completedEditedAt: editTime, ...patch,
     } } }, { merge: true }));
   });
+
+  describe("repeating tasks", () => {
+    const schedule = { nextDate: "2026-01-31", interval: 1, intervalUnit: "Months", anchorDate: "2026-01-31" };
+    const repeatingTask = {
+      title: "Rent", details: "Pay landlord", schedule,
+      titleEditedAt: oldTime, detailsEditedAt: oldTime, scheduleEditedAt: oldTime,
+    };
+
+    beforeEach(async () => {
+      await environment.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), "users/alice"), {
+          repeatingTasks: { rent: repeatingTask },
+        }, { merge: true });
+      });
+    });
+
+    it.each(["titleEditedAt", "detailsEditedAt", "scheduleEditedAt"])(
+      "requires a valid %s on repeating task creation", async (field) => {
+        const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+        for (const time of [deleteField(), "invalid", null, Timestamp.fromMillis(-1),
+          Timestamp.fromMillis(Date.now() + 600_000)]) {
+          await assertFails(setDoc(reference, {
+            operation: { type: "CreateRepeatingTask", repeatingTaskId: "new" },
+            repeatingTasks: { new: { ...repeatingTask, [field]: time } },
+          }, { merge: true }));
+        }
+        await assertSucceeds(setDoc(reference, {
+          operation: { type: "CreateRepeatingTask", repeatingTaskId: "new" },
+          repeatingTasks: { new: repeatingTask },
+        }, { merge: true }));
+      },
+    );
+
+    it.each([
+      ["SetRepeatingTaskTitle", "title", "Apartment rent", "titleEditedAt"],
+      ["SetRepeatingTaskDetails", "details", "Bank transfer", "detailsEditedAt"],
+      ["SetRepeatingTaskSchedule", "schedule", { ...schedule, interval: 2 }, "scheduleEditedAt"],
+    ])("rejects stale, equal, future, and invalid timestamps for %s", async (type, field, value, timestampField) => {
+      const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+      for (const time of [Timestamp.fromMillis(oldTime.toMillis() - 1), oldTime,
+        Timestamp.fromMillis(Date.now() + 600_000), "invalid", null, deleteField()]) {
+        await assertFails(setDoc(reference, {
+          operation: { type, repeatingTaskId: "rent" },
+          repeatingTasks: { rent: { [field]: value, [timestampField]: time } },
+        }, { merge: true }));
+      }
+      await assertSucceeds(setDoc(reference, {
+        operation: { type, repeatingTaskId: "rent" },
+        repeatingTasks: { rent: { [field]: value, [timestampField]: editTime } },
+      }, { merge: true }));
+    });
+
+    it("requires the created task to exist before advancing", async () => {
+      const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+      const advance = {
+        operation: { type: "AdvanceRepeatingTask", repeatingTaskId: "rent", createdTaskId: "created", scheduleEditedAt: oldTime },
+        repeatingTasks: { rent: { schedule: { nextDate: "2026-02-28" } } },
+      };
+      await assertFails(setDoc(reference, advance, { merge: true }));
+      expect((await getDoc(reference)).data()!.repeatingTasks.rent).toEqual(repeatingTask);
+
+      await assertSucceeds(setDoc(reference, {
+        operation: { type: "CreateTask", taskId: "created" },
+        tasks: { created: task },
+      }, { merge: true }));
+      await assertSucceeds(setDoc(reference, advance, { merge: true }));
+      expect((await getDoc(reference)).data()!.repeatingTasks.rent).toEqual({
+        ...repeatingTask, schedule: { ...schedule, nextDate: "2026-02-28" },
+      });
+    });
+
+    it.each(["2026-01-30", "2026-01-31"])("rejects advancement to an earlier or unchanged date: %s", async (nextDate) => {
+      const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+      const operation = {
+        type: "AdvanceRepeatingTask", repeatingTaskId: "rent", createdTaskId: "other", scheduleEditedAt: oldTime,
+      };
+      await assertFails(setDoc(reference, {
+        operation, repeatingTasks: { rent: { schedule: { nextDate } } },
+      }, { merge: true }));
+      expect((await getDoc(reference)).data()!.repeatingTasks.rent).toEqual(repeatingTask);
+      await assertSucceeds(setDoc(reference, {
+        operation, repeatingTasks: { rent: { schedule: { nextDate: "2026-02-28" } } },
+      }, { merge: true }));
+    });
+
+    it("rejects an old schedule version even when its next date is unchanged", async () => {
+      const reference = doc(environment.authenticatedContext("alice").firestore(), "users/alice");
+      await assertSucceeds(setDoc(reference, {
+        operation: { type: "SetRepeatingTaskSchedule", repeatingTaskId: "rent" },
+        repeatingTasks: { rent: { schedule: { ...schedule, interval: 2 }, scheduleEditedAt: editTime } },
+      }, { merge: true }));
+      const advance = {
+        operation: { type: "AdvanceRepeatingTask", repeatingTaskId: "rent", createdTaskId: "other", scheduleEditedAt: oldTime },
+        repeatingTasks: { rent: { schedule: { nextDate: "2026-03-31" } } },
+      };
+      await assertFails(setDoc(reference, advance, { merge: true }));
+      expect((await getDoc(reference)).data()!.repeatingTasks.rent).toEqual({
+        ...repeatingTask, schedule: { ...schedule, interval: 2 }, scheduleEditedAt: editTime,
+      });
+      await assertSucceeds(setDoc(reference, {
+        ...advance, operation: { ...advance.operation, scheduleEditedAt: editTime },
+      }, { merge: true }));
+      expect((await getDoc(reference)).data()!.repeatingTasks.rent).toEqual({
+        ...repeatingTask, schedule: { ...schedule, interval: 2, nextDate: "2026-03-31" }, scheduleEditedAt: editTime,
+      });
+    });
+  });
+
 });

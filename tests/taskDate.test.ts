@@ -2,6 +2,7 @@ import { afterEach, expect, expectTypeOf, it, vi } from "vitest";
 import { decodeTaskDate, formatTaskDate, taskDateFromUtcDate, taskDateOneYearFromToday, taskDateToday, utcDateFromTaskDate, type TaskDate } from "../src/taskDate";
 import type { Task } from "../src/task";
 import { setTaskDate } from "../src/userData";
+import type { RepeatingTask } from "../src/repeatingTask";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -61,6 +62,7 @@ it.each(["2026-02-29", "1900-02-29", "2026-04-31", "2026-13-01", "2026-1-01", ""
 it("requires validated dates in the task model and date writes", () => {
   expectTypeOf<string>().not.toExtend<TaskDate>();
   expectTypeOf<Task["date"]>().toEqualTypeOf<TaskDate>();
+  expectTypeOf<RepeatingTask["schedule"]["nextDate"]>().toEqualTypeOf<TaskDate>();
   expectTypeOf<Parameters<typeof setTaskDate>[2]>().toEqualTypeOf<TaskDate>();
   expectTypeOf<ReturnType<typeof taskDateToday>>().toEqualTypeOf<TaskDate>();
   expectTypeOf<ReturnType<typeof decodeTaskDate>>().toEqualTypeOf<TaskDate>();

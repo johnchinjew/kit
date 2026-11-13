@@ -4,15 +4,13 @@ Just a to-do list.
 
 ## Features
 
-- Schedule view: all non-completed tasks and projected repeating occurrences up to 1 year ahead, ordered by date.
+- Schedule view: all non-completed tasks and 1 year of occurrences for all repeating tasks, ordered by date.
 - Completed view: all completed tasks, ordered by completion date. Tasks are deleted 1 year after completion.
-- Task: title, details, date. Can be completed, reopened, and deleted. Can be converted into a repeating task by setting a
-  repetition schedule. May be a materialized occurrence of a repeating task in which case it is fully independent of the
-  repeating task. Every task must have a date (up to 1 year away).
-- Repeating task: title, details, repetition schedule (next date and interval up to 1 year away). Cannot be completed.
-  Can be deleted. Can be converted into a task by removing the repetition schedule (what would've been the next date
-  would then be used as the task's date). Open any projected occurrence of a repeating task to edit the same canonical
-  repeating task. Every unmaterialized occurrence dated today or earlier becomes a separate incomplete task.
+- Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task is fully
+  independent of that repeating task. Every task must have a date (up to 1 year away).
+- Repeating task: title, details, next occurrence date, and repetition interval (up to 1 year away). Cannot be
+  completed. Can be deleted. Open any occurrence to edit the same repeating task. Every occurrence dated today or
+  earlier becomes a separate incomplete task.
 - Persistence: Changes are synced in real time across devices. Offline changes are saved and synced when online.
   Concurrent changes are merged whenever possible. Conflicting edits use chronological last-edit-wins.
 

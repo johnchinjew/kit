@@ -4,37 +4,56 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && validWrite({});
-      allow update: if isOwner(userId) && validWrite(resource.data);
+      allow create, update: if isOwner(userId) && validWrite();
     }
 
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    function validWrite(oldData) {
+    function validWrite() {
       let data = request.resource.data;
-      return data.operation is map
-        && data.operation.type is string
-        && validTaskWrite(data, oldData);
-    }
+      let oldData = resource != null ? resource.data : {};
 
-    function validTaskWrite(data, oldData) {
+      let operation = data.operation;
+
+      let tasks = data.get('tasks', {});
+      let repeatingTasks = data.get('repeatingTasks', {});
+
       let oldTasks = oldData.get('tasks', {});
-      let operationType = data.operation.type;
-      let taskId = data.operation.taskId;
-      return oldTasks is map
-        && taskId is string
-        && data.tasks is map
+      let oldRepeatingTasks = oldData.get('repeatingTasks', {});
+
+      return operation is map
+        && operation.type is string
+        && tasks is map
+        && repeatingTasks is map
+        && oldTasks is map
+        && oldRepeatingTasks is map
         && (
-          (operationType == 'CreateTask'
-            && !(taskId in oldTasks) && taskId in data.tasks
-            && validTaskCreation(data.tasks[taskId]))
-          || (operationType == 'DeleteTask'
-            && taskId in oldTasks && !(taskId in data.tasks))
-          || (operationType in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask']
-            && taskId in oldTasks && taskId in data.tasks
-            && validTaskEdit(data.tasks[taskId], oldTasks[taskId], operationType))
+          (operation.type == 'CreateTask' && operation.taskId is string
+            && !(operation.taskId in oldTasks) && operation.taskId in tasks
+            && validTaskCreation(tasks[operation.taskId]))
+          || (operation.type == 'DeleteTask' && operation.taskId is string
+            && operation.taskId in oldTasks && !(operation.taskId in tasks))
+          || (operation.type in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask']
+            && operation.taskId is string && operation.taskId in oldTasks && operation.taskId in tasks
+            && validTaskEdit(operation, tasks[operation.taskId], oldTasks[operation.taskId]))
+          || (operation.type == 'CreateRepeatingTask' && operation.repeatingTaskId is string
+            && !(operation.repeatingTaskId in oldRepeatingTasks) && operation.repeatingTaskId in repeatingTasks
+            && validRepeatingTaskCreation(repeatingTasks[operation.repeatingTaskId]))
+          || (operation.type == 'DeleteRepeatingTask' && operation.repeatingTaskId is string
+            && operation.repeatingTaskId in oldRepeatingTasks && !(operation.repeatingTaskId in repeatingTasks))
+          || (operation.type in ['SetRepeatingTaskTitle', 'SetRepeatingTaskDetails', 'SetRepeatingTaskSchedule']
+            && operation.repeatingTaskId is string && operation.repeatingTaskId in oldRepeatingTasks && operation.repeatingTaskId in repeatingTasks
+            && validRepeatingTaskEdit(operation, repeatingTasks[operation.repeatingTaskId], oldRepeatingTasks[operation.repeatingTaskId]))
+          || (operation.type == 'AdvanceRepeatingTask'
+            && operation.repeatingTaskId is string && operation.repeatingTaskId in oldRepeatingTasks && operation.repeatingTaskId in repeatingTasks
+            && operation.createdTaskId is string && operation.createdTaskId in oldTasks
+            && validRepeatingTaskAdvancement(
+              operation,
+              repeatingTasks[operation.repeatingTaskId],
+              oldRepeatingTasks[operation.repeatingTaskId])
+            )
         );
     }
 
@@ -46,14 +65,35 @@ service cloud.firestore {
         && validEditTime(task.completedEditedAt);
     }
 
-    function validTaskEdit(task, oldTask, operationType) {
+    function validTaskEdit(operation, task, oldTask) {
       return task is map && oldTask is map && (
-        (operationType == 'SetTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
-        || (operationType == 'SetTaskDetails' && newerEdit(task, oldTask, 'detailsEditedAt'))
-        || (operationType == 'SetTaskDate' && newerEdit(task, oldTask, 'dateEditedAt'))
-        || (operationType == 'CompleteTask' && newerEdit(task, oldTask, 'completedEditedAt'))
-        || (operationType == 'ReopenTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        (operation.type == 'SetTaskTitle' && newerEdit(task, oldTask, 'titleEditedAt'))
+        || (operation.type == 'SetTaskDetails' && newerEdit(task, oldTask, 'detailsEditedAt'))
+        || (operation.type == 'SetTaskDate' && newerEdit(task, oldTask, 'dateEditedAt'))
+        || (operation.type == 'CompleteTask' && newerEdit(task, oldTask, 'completedEditedAt'))
+        || (operation.type == 'ReopenTask' && newerEdit(task, oldTask, 'completedEditedAt'))
       );
+    }
+
+    function validRepeatingTaskCreation(repeatingTask) {
+      return repeatingTask is map
+        && validEditTime(repeatingTask.titleEditedAt)
+        && validEditTime(repeatingTask.detailsEditedAt)
+        && validEditTime(repeatingTask.scheduleEditedAt);
+    }
+
+    function validRepeatingTaskEdit(operation, repeatingTask, oldRepeatingTask) {
+      return repeatingTask is map && oldRepeatingTask is map && (
+        (operation.type == 'SetRepeatingTaskTitle' && newerEdit(repeatingTask, oldRepeatingTask, 'titleEditedAt'))
+        || (operation.type == 'SetRepeatingTaskDetails' && newerEdit(repeatingTask, oldRepeatingTask, 'detailsEditedAt'))
+        || (operation.type == 'SetRepeatingTaskSchedule' && newerEdit(repeatingTask, oldRepeatingTask, 'scheduleEditedAt'))
+      );
+    }
+
+    function validRepeatingTaskAdvancement(operation, repeatingTask, oldRepeatingTask) {
+      return repeatingTask is map && oldRepeatingTask is map
+        && operation.scheduleEditedAt == oldRepeatingTask.scheduleEditedAt
+        && repeatingTask.schedule.nextDate > oldRepeatingTask.schedule.nextDate;
     }
 
     function newerEdit(data, oldData, field) {

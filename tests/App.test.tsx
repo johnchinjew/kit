@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { Timestamp } from "firebase/firestore";
 import { render } from "solid-js/web";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { decodeTaskDate } from "../src/taskDate";
 import { formatDate } from "../src/date";
-import { createTask, subscribeUserData, type UserData } from "../src/userData";
+import { createRepeatingTask, createTasksFromRepeatingTasks, createTask, subscribeUserData, type UserData } from "../src/userData";
 
 vi.mock("../src/session", () => ({
   createSession: () => ({
@@ -18,15 +18,81 @@ vi.mock("../src/session", () => ({
 vi.mock("../src/userData", async (importOriginal) => ({
   ...await importOriginal<typeof import("../src/userData")>(),
   subscribeUserData: vi.fn(),
-  createTask: vi.fn().mockResolvedValue(undefined),
+  createTask: vi.fn(),
+  createRepeatingTask: vi.fn(),
+  createTasksFromRepeatingTasks: vi.fn(),
 }));
 
 let dispose: (() => void) | undefined;
 
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.setSystemTime(new Date(2026, 10, 4, 12));
+  vi.mocked(createTask).mockResolvedValue(undefined);
+  vi.mocked(createRepeatingTask).mockResolvedValue(undefined);
+  vi.mocked(createTasksFromRepeatingTasks).mockResolvedValue(undefined);
+});
+
 afterEach(() => {
   dispose?.();
+  dispose = undefined;
   document.body.replaceChildren();
-  vi.resetAllMocks();
+  vi.useRealTimers();
+});
+
+it.each([false, true])("only processes the first snapshot, with initial due tasks=%s", async (initiallyDue) => {
+  const data: UserData = { tasks: {}, repeatingTasks: { rent: {
+    title: "Rent", details: "",
+    schedule: {
+      nextDate: decodeTaskDate("2026-11-04"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-11-04"),
+    },
+    scheduleEditedAt: Timestamp.now(),
+  } } };
+  let receive: (data: UserData) => void = () => {};
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    receive(initiallyDue ? data : { tasks: {}, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+
+  receive(data);
+  await Promise.resolve();
+  receive(data);
+  await Promise.resolve();
+
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledExactlyOnceWith(
+    "alice", initiallyDue ? data : { tasks: {}, repeatingTasks: {} },
+  );
+});
+
+it("shows startup recurrence failures and does not retry on later snapshots", async () => {
+  let rejectProcessing!: (error: Error) => void;
+  vi.mocked(createTasksFromRepeatingTasks).mockReturnValue(new Promise<void>((_resolve, reject) => {
+    rejectProcessing = reject;
+  }));
+  const data: UserData = { tasks: {}, repeatingTasks: { rent: {
+    title: "Rent", details: "",
+    schedule: {
+      nextDate: decodeTaskDate("2026-11-02"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-11-02"),
+    },
+    scheduleEditedAt: Timestamp.now(),
+  } } };
+  let receive: (data: UserData) => void = () => {};
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    receive(data);
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+
+  rejectProcessing(new Error("Write failed"));
+  await vi.waitFor(() => expect(document.body.textContent).toContain(
+    "Could not update repeating tasks. Please close and reopen Kit.",
+  ));
+  receive(data);
+  await Promise.resolve();
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledExactlyOnceWith("alice", data);
 });
 
 it("orders completed tasks by completion instant and displays completion dates", () => {
@@ -40,7 +106,7 @@ it("orders completed tasks by completion instant and displays completion dates",
       newest: { title: "Newest", details: "", date: decodeTaskDate("2026-10-09"), completedAt: newest },
       later: { title: "Later", details: "", completedAt: null, date: decodeTaskDate("2026-10-06") },
       earlier: { title: "Earlier", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") },
-    } });
+    }, repeatingTasks: {} });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
@@ -66,7 +132,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   let receive: (data: UserData) => void = () => {};
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
-    receive({ tasks: { selected: task, remaining } });
+    receive({ tasks: { selected: task, remaining }, repeatingTasks: {} });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
@@ -77,7 +143,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   }
   document.querySelector<HTMLButtonElement>("li button")!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("Deleted task");
-  receive({ tasks: { remaining } });
+  receive({ tasks: { remaining }, repeatingTasks: {} });
   expect(document.querySelector('[name="title"]')).toBeNull();
   expect(document.body.textContent).not.toContain("Loading task");
   expect(document.querySelector("select")!.value).toBe(completed ? "Completed" : "Schedule");
@@ -92,17 +158,142 @@ it("keeps a newly created task selected while waiting for its first snapshot", (
   let receive: (data: UserData) => void = () => {};
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
-    receive({ tasks: {} });
+    receive({ tasks: {}, repeatingTasks: {} });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "Add")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Add task")!.click();
   const taskId = vi.mocked(createTask).mock.calls[0]![1];
-  receive({ tasks: {} });
+  receive({ tasks: {}, repeatingTasks: {} });
   expect(document.body.textContent).toContain("Loading task");
   receive({ tasks: { [taskId]: {
     title: "New task", details: "", date: decodeTaskDate("2026-10-07"), completedAt: null,
-  } } });
+  } }, repeatingTasks: {} });
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("New task");
   expect(subscribeUserData).toHaveBeenCalledTimes(1);
+});
+
+it("projects a repeating task separately from its generated tasks", () => {
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onUserData) => {
+    onUserData({ tasks: {}, repeatingTasks: {
+      rent: {
+        title: "Rent", details: "",
+        schedule: {
+          nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Weeks", anchorDate: decodeTaskDate("2026-11-05"),
+        },
+        scheduleEditedAt: Timestamp.now(),
+      },
+    } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+
+  const rows = [...document.querySelectorAll("li")];
+  expect(rows.length).toBeGreaterThan(2);
+  expect(rows.length).toBeLessThanOrEqual(53);
+  expect(rows.slice(0, 2).map((row) => row.querySelector("button")!.textContent)).toEqual(["Rent", "Rent"]);
+  expect(rows.slice(0, 2).map((row) => row.querySelector("time")!.getAttribute("datetime"))).toEqual([
+    "2026-11-05", "2026-11-12",
+  ]);
+  document.querySelector<HTMLButtonElement>("li button")!.click();
+  expect(document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')).not.toBeNull();
+  expect([...document.querySelectorAll("button")].map((button) => button.textContent)).not.toContain("Complete");
+
+});
+
+it("keeps a newly created repeating task selected while waiting for its first snapshot", () => {
+  vi.mocked(createRepeatingTask).mockImplementation(() => new Promise(() => {}));
+  let receive: (data: UserData) => void = () => {};
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    receive({ tasks: {}, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Add repeating task")!.click();
+  const repeatingTaskId = vi.mocked(createRepeatingTask).mock.calls[0]![1];
+  receive({ tasks: {}, repeatingTasks: {} });
+  expect(document.body.textContent).toContain("Loading repeating task");
+  receive({ tasks: {}, repeatingTasks: { [repeatingTaskId]: {
+    title: "", details: "",
+    schedule: {
+      nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-11-05"),
+    },
+    scheduleEditedAt: Timestamp.now(),
+  } } });
+  expect(document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!.value).toBe("Days");
+  expect(document.querySelector("button")!.textContent).toBe("Back");
+});
+
+it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft during live updates", (kind) => {
+  const task = { title: "Task", details: "", date: decodeTaskDate("2026-11-05"), completedAt: null };
+  const repeatingTask = {
+    title: "Repeating", details: "",
+    schedule: {
+      nextDate: decodeTaskDate("2026-11-06"), interval: 1, intervalUnit: "Weeks" as const, anchorDate: decodeTaskDate("2026-11-06"),
+    },
+    scheduleEditedAt: Timestamp.now(),
+  };
+  let receive: (data: UserData) => void = () => {};
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    receive({ tasks: { task }, repeatingTasks: { repeating: repeatingTask } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+
+  const otherTitle = kind === "Task" ? "Repeating" : "Task";
+  [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.textContent === otherTitle)!.click();
+  expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe(kind === "Task" ? "Repeating" : "Task");
+  [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Back")!.click();
+
+  const title = kind === "Task" ? "Task" : "Repeating";
+  [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.textContent === title)!.click();
+  const input = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  expect(input.value).toBe(kind === "Task" ? "Task" : "Repeating");
+  expect(document.querySelector('[name="intervalUnit"]') !== null).toBe(kind === "RepeatingTask");
+  input.value = "Local draft";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+
+  receive({
+    tasks: { task: { ...task, title: "Remote task", completedAt: Timestamp.now() } },
+    repeatingTasks: { repeating: { ...repeatingTask, title: "Remote repeating task" } },
+  });
+
+  expect(document.querySelector('[name="title"]')).toBe(input);
+  expect(input.value).toBe("Local draft");
+  expect(input.readOnly).toBe(kind === "Task");
+  expect(subscribeUserData).toHaveBeenCalledTimes(1);
+});
+
+it("sorts tasks and repeating rows together and excludes completed tasks", () => {
+  const completedAt = Timestamp.fromDate(new Date("2026-11-03T12:00:00Z"));
+  const data: UserData = {
+    tasks: {
+      later: { title: "Later", details: "", date: decodeTaskDate("2026-11-06"), completedAt: null },
+      done: { title: "Done", details: "", date: decodeTaskDate("2026-11-01"), completedAt },
+      earlier: { title: "Earlier", details: "", date: decodeTaskDate("2026-11-04"), completedAt: null },
+    },
+    repeatingTasks: {
+      yearly: {
+        title: "Yearly", details: "",
+        schedule: {
+          nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Years", anchorDate: decodeTaskDate("2026-11-05"),
+        },
+        scheduleEditedAt: Timestamp.now(),
+      },
+    },
+  };
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData(data);
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+
+  expect([...document.querySelectorAll("li button")].map((button) => button.textContent)).toEqual(["Earlier", "Yearly", "Later"]);
+  expect([...document.querySelectorAll("li time")].map((time) => time.getAttribute("datetime"))).toEqual([
+    "2026-11-04", "2026-11-05", "2026-11-06",
+  ]);
+  expect(document.querySelectorAll("li")[1]!.textContent).toContain("↻");
+
 });

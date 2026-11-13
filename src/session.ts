@@ -45,7 +45,7 @@ export function createSession(showNotice: (message: string) => void) {
     setSession({ status: "SigningIn" });
     try {
       const provider = new GoogleAuthProvider();
-      // Prompt for account selection to support switching user
+      // Prompt for account selection to support switching user.
       provider.setCustomParameters({ prompt: "select_account" });
       await signInWithRedirect(getAuth(), provider);
     } catch (error) {
