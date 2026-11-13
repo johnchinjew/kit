@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
-import Editor from "./Editor";
+import TaskEditor from "./TaskEditor";
 import { formatTaskDate } from "./taskDate";
 import { formatDate } from "./date";
 import { createNotice } from "./notice";
@@ -132,7 +132,7 @@ function AppSignedIn(props: {
         {(taskId) => (
           <Show when={userData().tasks[taskId()]} fallback={<p>Loading task</p>}>
             {(task) => (
-              <Editor
+              <TaskEditor
                 taskId={taskId()}
                 task={task()}
                 session={props.session}

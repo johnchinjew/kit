@@ -17,7 +17,7 @@ type TaskDraft = {
   date: string;
 };
 
-export default function Editor(props: {
+export default function TaskEditor(props: {
   taskId: string;
   task: Task;
   session: SignedIn;

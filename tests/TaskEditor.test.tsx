@@ -4,7 +4,7 @@ import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { afterEach, expect, it, vi } from "vitest";
 import { decodeTaskDate } from "../src/taskDate";
-import Editor from "../src/Editor";
+import TaskEditor from "../src/TaskEditor";
 import type { Task } from "../src/task";
 import { completeTask, deleteTask, reopenTask, setTaskDate, setTaskDetails, setTaskTitle } from "../src/userData";
 
@@ -29,7 +29,7 @@ afterEach(() => {
 it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", (action) => {
   const onBack = vi.fn();
   dispose = render(() => (
-    <Editor
+    <TaskEditor
       taskId="first"
       task={{ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
@@ -68,7 +68,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
 
 it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s", (action) => {
   dispose = render(() => (
-    <Editor
+    <TaskEditor
       taskId="first"
       task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
@@ -102,7 +102,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
 it("does not save a draft if the task is completed on another device", () => {
   const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
-    <Editor
+    <TaskEditor
       taskId="first"
       task={task()}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
@@ -135,7 +135,7 @@ it("prevents saving a cleared task date", () => {
   const showNotice = vi.fn();
   const onBack = vi.fn();
   dispose = render(() => (
-    <Editor
+    <TaskEditor
       taskId="first"
       task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
@@ -160,7 +160,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
   const showNotice = vi.fn();
   const onBack = vi.fn();
   dispose = render(() => (
-    <Editor
+    <TaskEditor
       taskId="first"
       task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
@@ -191,7 +191,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
 it.each(["title", "date", "details"] as const)("saves only the edited %s when the other field changes remotely", (field) => {
   const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
   dispose = render(() => (
-    <Editor
+    <TaskEditor
       taskId="first"
       task={task()}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
@@ -226,7 +226,7 @@ it("can clear details and reports a failed save", async () => {
   const showNotice = vi.fn();
   vi.mocked(setTaskDetails).mockRejectedValueOnce(new Error("Offline"));
   dispose = render(() => (
-    <Editor taskId="first"
+    <TaskEditor taskId="first"
       task={{ title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice} onBack={vi.fn()} />
@@ -246,7 +246,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
     completedAt: state === "completed" ? Timestamp.now() : null,
   };
   const onBack = vi.fn();
-  dispose = render(() => <Editor taskId="first" task={task}
+  dispose = render(() => <TaskEditor taskId="first" task={task}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()} onBack={onBack} />, document.body);
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
@@ -266,7 +266,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
 it("reports a failed deletion", async () => {
   const showNotice = vi.fn();
   vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Delete failed"));
-  dispose = render(() => <Editor taskId="first"
+  dispose = render(() => <TaskEditor taskId="first"
     task={{ title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={showNotice} onBack={vi.fn()} />, document.body);
