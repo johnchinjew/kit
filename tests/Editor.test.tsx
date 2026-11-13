@@ -32,7 +32,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
     <Editor
       taskId="first"
       task={{ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={onBack}
     />
@@ -71,7 +71,7 @@ it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s"
     <Editor
       taskId="first"
       task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
     />
@@ -105,7 +105,7 @@ it("does not save a draft if the task is completed on another device", () => {
     <Editor
       taskId="first"
       task={task()}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
     />
@@ -138,7 +138,7 @@ it("prevents saving a cleared task date", () => {
     <Editor
       taskId="first"
       task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
     />
@@ -163,7 +163,7 @@ it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", 
     <Editor
       taskId="first"
       task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
     />
@@ -194,7 +194,7 @@ it.each(["title", "date", "details"] as const)("saves only the edited %s when th
     <Editor
       taskId="first"
       task={task()}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
     />
@@ -228,7 +228,7 @@ it("can clear details and reports a failed save", async () => {
   dispose = render(() => (
     <Editor taskId="first"
       task={{ title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null }}
-      session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice} onBack={vi.fn()} />
   ), document.body);
   const details = document.querySelector("textarea")!;
@@ -247,7 +247,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
   };
   const onBack = vi.fn();
   dispose = render(() => <Editor taskId="first" task={task}
-    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()} onBack={onBack} />, document.body);
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
   title.value = "Unsaved title";
@@ -268,7 +268,7 @@ it("reports a failed deletion", async () => {
   vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Delete failed"));
   dispose = render(() => <Editor taskId="first"
     task={{ title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
-    session={{ status: "SignedIn", user: { id: "alice", photoUrl: null } }}
+    session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={showNotice} onBack={vi.fn()} />, document.body);
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
   await Promise.resolve();

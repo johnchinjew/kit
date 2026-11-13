@@ -100,11 +100,11 @@ function decodeUserData(data: unknown): UserData {
   if (!isRecord(data.tasks)) throw new Error("Invalid tasks map");
 
   return {
-    tasks: Object.fromEntries(Object.entries(data.tasks).map(([id, task]) => [id, decodeTask(id, task)])),
+    tasks: Object.fromEntries(Object.entries(data.tasks).map(([taskId, task]) => [taskId, decodeTask(taskId, task)])),
   };
 }
 
-function decodeTask(id: string, data: unknown): Task {
+function decodeTask(taskId: string, data: unknown): Task {
   if (
     !isRecord(data)
     || typeof data.title !== "string"
@@ -112,17 +112,17 @@ function decodeTask(id: string, data: unknown): Task {
     || typeof data.completed !== "boolean"
     || typeof data.date !== "string"
   ) {
-    throw new Error(`Invalid task ${id}`);
+    throw new Error(`Invalid task ${taskId}`);
   }
   let date: TaskDate;
   try {
     date = decodeTaskDate(data.date);
   } catch {
-    throw new Error(`Invalid task ${id}: invalid date`);
+    throw new Error(`Invalid task ${taskId}: invalid date`);
   }
   if (data.completed) {
     if (!(data.completedEditedAt instanceof Timestamp)) {
-      throw new Error(`Invalid task ${id}: invalid completion timestamp`);
+      throw new Error(`Invalid task ${taskId}: invalid completion timestamp`);
     }
     return { title: data.title, details: data.details, date, completedAt: data.completedEditedAt };
   }

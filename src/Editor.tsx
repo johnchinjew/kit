@@ -60,21 +60,21 @@ export default function Editor(props: {
     if (!saveDate()) return;
     saveTitle();
     saveDetails();
-    void completeTask(props.session.user.id, props.taskId).catch(() => {
+    void completeTask(props.session.user.userId, props.taskId).catch(() => {
       props.showNotice("Could not complete task. Try again later.");
     });
     props.onBack();
   };
 
   const onClickReopen: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
-    void reopenTask(props.session.user.id, props.taskId).catch(() => {
+    void reopenTask(props.session.user.userId, props.taskId).catch(() => {
       props.showNotice("Could not reopen task. Try again later.");
     });
     props.onBack();
   };
 
   const onClickDelete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
-    void deleteTask(props.session.user.id, props.taskId).catch(() => {
+    void deleteTask(props.session.user.userId, props.taskId).catch(() => {
       props.showNotice("Could not delete task. Try again later.");
     });
     props.onBack();
@@ -82,7 +82,7 @@ export default function Editor(props: {
 
   function saveTitle() {
     if (props.task.completedAt === null && draft().title !== initialTask.title) {
-      void setTaskTitle(props.session.user.id, props.taskId, draft().title).catch(() => {
+      void setTaskTitle(props.session.user.userId, props.taskId, draft().title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
@@ -90,7 +90,7 @@ export default function Editor(props: {
 
   function saveDetails() {
     if (props.task.completedAt === null && draft().details !== initialTask.details) {
-      void setTaskDetails(props.session.user.id, props.taskId, draft().details).catch(() => {
+      void setTaskDetails(props.session.user.userId, props.taskId, draft().details).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
@@ -110,7 +110,7 @@ export default function Editor(props: {
         props.showNotice("The date cannot be more than 1 year in the future.");
         return false;
       }
-      void setTaskDate(props.session.user.id, props.taskId, validatedDate).catch(() => {
+      void setTaskDate(props.session.user.userId, props.taskId, validatedDate).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }

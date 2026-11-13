@@ -8,7 +8,7 @@ import {
 } from "firebase/auth";
 import { createSignal, onCleanup } from "solid-js";
 
-export type User = { id: string; photoUrl: string | null; };
+export type User = { userId: string; photoUrl: string | null; };
 
 export type Session =
   | CheckingAuth
@@ -33,7 +33,7 @@ export function createSession(showNotice: (message: string) => void) {
   const unsubscribe = onAuthStateChanged(getAuth(), (user) => {
     setSession(
       user
-        ? { status: "SignedIn", user: { id: user.uid, photoUrl: user.photoURL } }
+        ? { status: "SignedIn", user: { userId: user.uid, photoUrl: user.photoURL } }
         : { status: "SignedOut" },
     );
   });

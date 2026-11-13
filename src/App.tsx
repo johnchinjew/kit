@@ -52,7 +52,7 @@ function AppSignedIn(props: {
 
   createEffect(() => {
     setUserData(emptyUserData());
-    const unsubscribe = subscribeUserData(props.session.user.id, (data) => untrack(() => {
+    const unsubscribe = subscribeUserData(props.session.user.userId, (data) => untrack(() => {
       const taskId = selectedTaskId();
       if (taskId && userData().tasks[taskId] && !data.tasks[taskId]) setSelectedTaskId(undefined);
       setUserData(data);
@@ -64,7 +64,7 @@ function AppSignedIn(props: {
 
   function addTask() {
     const taskId = crypto.randomUUID();
-    void createTask(props.session.user.id, taskId).catch(() => {
+    void createTask(props.session.user.userId, taskId).catch(() => {
       props.showNotice("Could not create task. Try again later.");
       if (selectedTaskId() === taskId) setSelectedTaskId(undefined);
     });

@@ -9,7 +9,7 @@ import { createTask, subscribeUserData, type UserData } from "../src/userData";
 
 vi.mock("../src/session", () => ({
   createSession: () => ({
-    session: () => ({ status: "SignedIn", user: { id: "alice", photoUrl: null } }),
+    session: () => ({ status: "SignedIn", user: { userId: "alice", photoUrl: null } }),
     signIn: vi.fn(),
     signOut: vi.fn(),
   }),
@@ -64,7 +64,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   const task = { title: "Deleted task", details: "", date: decodeTaskDate("2026-10-07"), completedAt };
   const remaining = { ...task, title: "Remaining task" };
   let receive: (data: UserData) => void = () => {};
-  vi.mocked(subscribeUserData).mockImplementation((_id, onData) => {
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     receive({ tasks: { selected: task, remaining } });
     return vi.fn();
@@ -90,7 +90,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
 it("keeps a newly created task selected while waiting for its first snapshot", () => {
   vi.mocked(createTask).mockImplementation(() => new Promise(() => {}));
   let receive: (data: UserData) => void = () => {};
-  vi.mocked(subscribeUserData).mockImplementation((_id, onData) => {
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     receive({ tasks: {} });
     return vi.fn();

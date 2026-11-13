@@ -175,8 +175,8 @@ describe("Firestore security rules", () => {
   });
 
   it("allows concurrent creates without losing tasks", async () => {
-    const ids = [crypto.randomUUID(), crypto.randomUUID()];
-    await Promise.all(ids.map(async (taskId) => {
+    const taskIds = [crypto.randomUUID(), crypto.randomUUID()];
+    await Promise.all(taskIds.map(async (taskId) => {
       const db = environment.authenticatedContext("alice").firestore();
       await assertSucceeds(setDoc(doc(db, "users/alice"), {
         operation: { type: "CreateTask", taskId }, tasks: { [taskId]: {
