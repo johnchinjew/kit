@@ -145,6 +145,8 @@ function AppSignedIn(props: {
   );
 }
 
+// SIGNED IN LIST
+
 function List(props: {
   userData: UserData;
   listMode: ListMode;
@@ -157,18 +159,12 @@ function List(props: {
 }) {
   return (
     <>
-      <TextButton onClick={props.signOut}>Sign out</TextButton>
-      <ProfilePhoto photoUrl={props.photoUrl} />
-      <select
-        value={props.listMode}
-        onChange={(event) => {
-          const mode = event.currentTarget.value;
-          if (mode === "Schedule" || mode === "Completed") props.setListMode(mode);
-        }}
-      >
-        <option value="Schedule">Schedule</option>
-        <option value="Completed">Completed</option>
-      </select>
+      <MenuBar
+        listMode={props.listMode}
+        photoUrl={props.photoUrl}
+        signOut={props.signOut}
+        setListMode={props.setListMode}
+      />
       <Switch>
         <Match when={props.listMode === "Schedule"}>
           <ul>
@@ -228,6 +224,48 @@ function List(props: {
   );
 }
 
+function MenuBar(props: {
+  listMode: ListMode;
+  photoUrl: string | null;
+  signOut: () => void;
+  setListMode: (mode: ListMode) => void;
+}) {
+  return (
+    <header class="p-4 grid grid-cols-[1fr_auto_1fr] items-center">
+      <select
+        class="col-start-2"
+        value={props.listMode}
+        onChange={(event) => {
+          const mode = event.currentTarget.value;
+          if (mode === "Schedule" || mode === "Completed") props.setListMode(mode);
+        }}
+      >
+        <option value="Schedule">Schedule</option>
+        <option value="Completed">Completed</option>
+      </select>
+      <div class="col-start-3 justify-self-end">
+        <SignOutButton photoUrl={props.photoUrl} signOut={props.signOut} />
+      </div>
+    </header>
+  );
+}
+
+function SignOutButton(props: { photoUrl: string | null; signOut: () => void; }) {
+  return (
+    <button
+      type="button"
+      class="block size-8 rounded-full cursor-pointer"
+      onClick={props.signOut}
+    >
+      <img
+        class="size-full rounded-full object-cover"
+        src={props.photoUrl ?? "/assets/profile-placeholder.svg"}
+        alt="Profile photo"
+      />
+    </button>
+  );
+}
+
 function scheduleRows(data: UserData): ScheduleRow[] {
   const taskRows: ScheduleRow[] = Object.entries(data.tasks)
     .flatMap(([taskId, task]) =>
@@ -252,6 +290,8 @@ function completedRows(data: UserData): CompletedRow[] {
     )
     .sort((left, right) => right.completedAt.seconds - left.completedAt.seconds || right.completedAt.nanoseconds - left.completedAt.nanoseconds);
 }
+
+// SIGNED IN EDITOR
 
 function Editor(props: {
   session: SignedIn;
@@ -294,10 +334,6 @@ function Editor(props: {
       </Match>
     </Switch>
   );
-}
-
-function ProfilePhoto(props: { photoUrl: string | null; }) {
-  return <img src={props.photoUrl ?? "/assets/profile-placeholder.svg"} alt="Profile photo" />;
 }
 
 // SIGNED OUT
