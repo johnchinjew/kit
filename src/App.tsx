@@ -3,6 +3,7 @@ import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
 import Button from "./components/Button";
 import TextButton from "./components/TextButton";
+import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
 import { formatTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
@@ -46,7 +47,7 @@ export default function App() {
           </Button>
         </Match>
       </Switch>
-      <Show when={notice()}>{(message) => <p>{message()}</p>}</Show>
+      <Show when={notice()}>{(message) => <Notice message={message()} />}</Show>
     </>
   );
 }
