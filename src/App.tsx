@@ -23,7 +23,9 @@ export default function App() {
   const { notice, showNotice } = createNotice();
   const { session, signIn, signOut } = createSession(showNotice);
 
-  showNotice("This is a work in progress demo and may contain bugs!");
+  if (import.meta.env.MODE !== "emulator") {
+    showNotice("This is a work in progress demo and may contain bugs!");
+  }
 
   return (
     <>

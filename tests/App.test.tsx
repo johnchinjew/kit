@@ -38,6 +38,18 @@ afterEach(() => {
   dispose = undefined;
   document.body.replaceChildren();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
+
+it.each([
+  { mode: "emulator", showBanner: false },
+  { mode: "production", showBanner: true },
+])("hides the work-in-progress notice in emulator mode ($mode)", ({ mode, showBanner }) => {
+  vi.stubEnv("MODE", mode);
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+
+  expect(document.body.textContent?.includes("This is a work in progress demo and may contain bugs!")).toBe(showBanner);
 });
 
 it.each([false, true])("only processes the first snapshot, with initial due tasks=%s", async (initiallyDue) => {

@@ -3,12 +3,12 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     solidPlugin(),
     tailwindcss(),
     VitePWA({
-      registerType: "prompt",
+      registerType: mode === "emulator" ? "autoUpdate" : "prompt",
       workbox: {
         navigateFallbackDenylist: [/^\/__/],
       },
@@ -39,4 +39,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+}));
