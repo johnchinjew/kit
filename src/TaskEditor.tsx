@@ -1,3 +1,4 @@
+import TextButton from "./components/TextButton";
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
 import type { Task } from "./task";
@@ -120,9 +121,9 @@ export default function TaskEditor(props: {
 
   return (
     <main>
-      <button type="button" onClick={onClickBack}>
+      <TextButton onClick={onClickBack}>
         Back
-      </button>
+      </TextButton>
       <input
         name="title"
         type="text"
@@ -145,18 +146,18 @@ export default function TaskEditor(props: {
         onInput={onChangeDate}
       />
       <Show when={props.task.completedAt === null}>
-        <button type="button" onClick={onClickComplete}>
+        <TextButton onClick={onClickComplete}>
           Complete
-        </button>
+        </TextButton>
       </Show>
       <Show when={props.task.completedAt !== null}>
-        <button type="button" onClick={onClickReopen}>
+        <TextButton onClick={onClickReopen}>
           Reopen
-        </button>
+        </TextButton>
       </Show>
-      <button type="button" onClick={onClickDelete}>
+      <TextButton onClick={onClickDelete}>
         Delete
-      </button>
+      </TextButton>
     </main>
   );
 }

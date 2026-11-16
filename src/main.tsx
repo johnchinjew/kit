@@ -41,7 +41,7 @@ initializeFirestore(getApp(), {
 });
 
 if (import.meta.env.MODE === "emulator") {
-  connectAuthEmulator(getAuth(), `http://${window.location.hostname}:9099`);
+  connectAuthEmulator(getAuth(), `http://${window.location.hostname}:9099`, { disableWarnings: true });
   connectFirestoreEmulator(getFirestore(), window.location.hostname, 8080);
 }
 

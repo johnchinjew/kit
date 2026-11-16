@@ -1,3 +1,67 @@
 @import "tailwindcss";
 
-@source "..";
+/* Lock down the Tailwind classes to a controlled set of design tokens. */
+@theme inline {
+  --*: initial;
+
+  --color-background: var(--app-color-background);
+  --color-foreground: var(--app-color-foreground);
+  --color-foreground-muted: var(--app-color-foreground-muted);
+  --color-border: var(--app-color-border);
+
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --text-sm: 0.75rem;
+  --text-base: 1rem;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  --leading-none: 1;
+  --leading-normal: 1.5;
+
+  --radius-md: 14px;
+  --radius-full: 9999px;
+
+  --shadow-lg: var(--app-shadow-lg);
+
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+
+  --spacing: 0.25rem;
+
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+}
+
+@layer base {
+  :root {
+    /* Enable browser light/dark theming for entire app */
+    color-scheme: light dark;
+
+    --app-color-background: #ffffff;
+    --app-color-foreground: #5e5e5e;
+    --app-color-foreground-muted: #a5a5a5;
+    --app-color-border: #e8e8e8;
+    --app-shadow-lg:
+      0 20px 40px -24px rgb(0 0 0 / 0.28),
+      0 10px 18px -14px rgb(0 0 0 / 0.20);
+
+    /* Set background here to accommodate the mobile "overscroll" scenario. */
+    @apply bg-background;
+
+    /* Set the default text styles for the app. */
+    @apply font-sans text-base font-normal leading-normal text-foreground;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --app-color-background: #232527;
+      --app-color-foreground: #c3c5c7;
+      --app-color-foreground-muted: #737577;
+      --app-color-border: #333537;
+      --app-shadow-lg:
+        0 20px 40px -24px rgb(0 0 0 / 0.55),
+        0 10px 18px -14px rgb(0 0 0 / 0.38);
+    }
+  }
+}

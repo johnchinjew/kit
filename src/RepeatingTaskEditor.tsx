@@ -1,3 +1,4 @@
+import TextButton from "./components/TextButton";
 import { createSignal, type JSX } from "solid-js";
 import { maxInterval, type IntervalUnit, type RepeatingTask, type Schedule } from "./repeatingTask";
 import type { SignedIn } from "./session";
@@ -146,9 +147,9 @@ export default function RepeatingTaskEditor(props: {
 
   return (
     <main>
-      <button type="button" onClick={onClickBack}>
+      <TextButton onClick={onClickBack}>
         Back
-      </button>
+      </TextButton>
       <input
         name="title"
         type="text"
@@ -185,9 +186,9 @@ export default function RepeatingTaskEditor(props: {
         <option value="Months">Months</option>
         <option value="Years">Years</option>
       </select>
-      <button type="button" onClick={onClickDelete}>
+      <TextButton onClick={onClickDelete}>
         Delete
-      </button>
+      </TextButton>
     </main>
   );
 }

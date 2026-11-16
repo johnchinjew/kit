@@ -1,6 +1,8 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
+import Button from "./components/Button";
+import TextButton from "./components/TextButton";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
 import { formatTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
@@ -39,9 +41,9 @@ export default function App() {
           )}
         </Match>
         <Match when={session().status === "SignedOut"}>
-          <button type="button" onClick={signIn}>
+          <Button onClick={signIn}>
             Sign in with Google
-          </button>
+          </Button>
         </Match>
       </Switch>
       <Show when={notice()}>{(message) => <p>{message()}</p>}</Show>
@@ -149,7 +151,7 @@ function List(props: {
 }) {
   return (
     <>
-      <button type="button" onClick={props.signOut}>Sign out</button>
+      <TextButton onClick={props.signOut}>Sign out</TextButton>
       <ProfilePhoto photoUrl={props.photoUrl} />
       <select
         value={props.listMode}
@@ -213,8 +215,8 @@ function List(props: {
         </Match>
       </Switch>
       <Show when={props.listMode === "Schedule"}>
-        <button type="button" onClick={props.addTask}>Add task</button>
-        <button type="button" onClick={props.addRepeatingTask}>Add repeating task</button>
+        <TextButton onClick={props.addTask}>Add task</TextButton>
+        <TextButton onClick={props.addRepeatingTask}>Add repeating task</TextButton>
       </Show>
     </>
   );
