@@ -9,7 +9,7 @@ import { occurrenceDates } from "./repeatingTask";
 import { formatTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import { formatDate } from "./date";
 import { createNotice } from "./notice";
-import { createSession, type SignedIn, type SigningOut } from "./session";
+import { createSession, type SignedIn } from "./session";
 import {
   createRepeatingTask,
   createTasksFromRepeatingTasks,
@@ -28,29 +28,32 @@ export default function App() {
   return (
     <>
       <Switch>
-        <Match when={session().status === "CheckingAuth"}><p>Loading</p></Match>
-        <Match when={session().status === "SigningIn"}><p>Signing in</p></Match>
+        <Match when={session().status === "CheckingAuth"}><AppLoading /></Match>
+        <Match when={session().status === "SigningIn"}><AppLoading /></Match>
+        <Match when={session().status === "SigningOut"}><AppLoading /></Match>
         <Match when={session().status === "SignedIn" && (session() as SignedIn)}>
           {(current) => <AppSignedIn session={current()} signOut={signOut} showNotice={showNotice} />}
         </Match>
-        <Match when={session().status === "SigningOut" && (session() as SigningOut)}>
-          {(current) => (
-            <>
-              <p>Signing out</p>
-              <ProfilePhoto photoUrl={current().user.photoUrl} />
-            </>
-          )}
-        </Match>
         <Match when={session().status === "SignedOut"}>
-          <Button onClick={signIn}>
-            Sign in with Google
-          </Button>
+          <AppSignedOut signIn={signIn} />
         </Match>
       </Switch>
       <Show when={notice()}>{(message) => <Notice message={message()} />}</Show>
     </>
   );
 }
+
+// LOADING
+
+function AppLoading() {
+  return (
+    <main class="p-4 w-full max-w-lg mx-auto">
+      <p class="px-4 py-2.5 text-center">Loading...</p>
+    </main>
+  );
+}
+
+// SIGNED IN
 
 type ListMode = "Schedule" | "Completed";
 type Selection = { type: "Task"; taskId: string; } | { type: "RepeatingTask"; repeatingTaskId: string; };
@@ -293,4 +296,16 @@ function Editor(props: {
 
 function ProfilePhoto(props: { photoUrl: string | null; }) {
   return <img src={props.photoUrl ?? "/assets/profile-placeholder.svg"} alt="Profile photo" />;
+}
+
+// SIGNED OUT
+
+function AppSignedOut(props: { signIn: () => void; }) {
+  return (
+    <main class="p-4 w-full max-w-lg mx-auto">
+      <Button onClick={props.signIn}>
+        Sign in with Google
+      </Button>
+    </main>
+  );
 }
