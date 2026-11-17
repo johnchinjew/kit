@@ -2,7 +2,6 @@ import { createEffect, createSignal, For, Match, onCleanup, Show, Switch, untrac
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
 import Button from "./components/Button";
-import TextButton from "./components/TextButton";
 import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
@@ -49,7 +48,7 @@ export default function App() {
 
 function AppLoading() {
   return (
-    <main class="p-4 w-full max-w-lg mx-auto">
+    <main class="p-4 mx-auto w-full max-w-lg">
       <p class="px-4 py-2.5 text-center">Loading...</p>
     </main>
   );
@@ -158,13 +157,16 @@ function List(props: {
   addRepeatingTask: () => void;
 }) {
   return (
-    <>
+    <div class="min-h-dvh flex flex-col">
       <MenuBar
         listMode={props.listMode}
         photoUrl={props.photoUrl}
         signOut={props.signOut}
         setListMode={props.setListMode}
       />
+      <Show when={props.listMode === "Schedule"}>
+        <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
+      </Show>
       <Switch>
         <Match when={props.listMode === "Schedule"}>
           <ul>
@@ -216,11 +218,7 @@ function List(props: {
           </ul>
         </Match>
       </Switch>
-      <Show when={props.listMode === "Schedule"}>
-        <TextButton onClick={props.addTask}>Add task</TextButton>
-        <TextButton onClick={props.addRepeatingTask}>Add repeating task</TextButton>
-      </Show>
-    </>
+    </div>
   );
 }
 
@@ -247,6 +245,18 @@ function MenuBar(props: {
         <SignOutButton photoUrl={props.photoUrl} signOut={props.signOut} />
       </div>
     </header>
+  );
+}
+
+function ActionBar(props: {
+  addTask: () => void;
+  addRepeatingTask: () => void;
+}) {
+  return (
+    <div class="order-last sticky bottom-0 mt-auto mx-auto w-full max-w-lg flex gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <Button onClick={props.addTask}>＋ Task</Button>
+      <Button onClick={props.addRepeatingTask}>＋ Repeating Task</Button>
+    </div>
   );
 }
 
@@ -340,7 +350,7 @@ function Editor(props: {
 
 function AppSignedOut(props: { signIn: () => void; }) {
   return (
-    <main class="p-4 w-full max-w-lg mx-auto">
+    <main class="p-4 mx-auto w-full max-w-lg">
       <Button onClick={props.signIn}>
         Sign in with Google
       </Button>

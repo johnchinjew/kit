@@ -174,7 +174,7 @@ it("keeps a newly created task selected while waiting for its first snapshot", (
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "Add task")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
   const taskId = vi.mocked(createTask).mock.calls[0]![1];
   receive({ tasks: {}, repeatingTasks: {} });
   expect(document.body.textContent).toContain("Loading task");
@@ -222,7 +222,7 @@ it("keeps a newly created repeating task selected while waiting for its first sn
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "Add repeating task")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Repeating Task")!.click();
   const repeatingTaskId = vi.mocked(createRepeatingTask).mock.calls[0]![1];
   receive({ tasks: {}, repeatingTasks: {} });
   expect(document.body.textContent).toContain("Loading repeating task");
