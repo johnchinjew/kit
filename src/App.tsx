@@ -169,53 +169,57 @@ function List(props: {
       </Show>
       <Switch>
         <Match when={props.listMode === "Schedule"}>
-          <ul>
-            <For each={scheduleRows(props.userData)}>
-              {(row) => (
-                <li>
-                  <Switch>
-                    <Match when={row.type === "Task" && row}>
-                      {(taskRow) => (
-                        <>
-                          <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: taskRow().taskId })}>
-                            {taskRow().title || "Untitled"}
-                          </button>
-                          <time dateTime={taskRow().date}>{formatTaskDate(taskRow().date)}</time>
-                        </>
-                      )}
-                    </Match>
-                    <Match when={row.type === "RepeatingTask" && row}>
-                      {(repeatingTaskRow) => (
-                        <>
-                          <button type="button" onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: repeatingTaskRow().repeatingTaskId })}>
-                            {repeatingTaskRow().title || "Untitled"}
-                          </button>
-                          ↻
-                          <time dateTime={repeatingTaskRow().date}>{formatTaskDate(repeatingTaskRow().date)}</time>
-                        </>
-                      )}
-                    </Match>
-                  </Switch>
-                </li>
-              )}
-            </For>
-          </ul>
+          <main class="px-4 mx-auto w-full max-w-lg">
+            <ul class="px-4">
+              <For each={scheduleRows(props.userData)}>
+                {(row) => (
+                  <li>
+                    <Switch>
+                      <Match when={row.type === "Task" && row}>
+                        {(taskRow) => (
+                          <>
+                            <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: taskRow().taskId })}>
+                              {taskRow().title || "Untitled"}
+                            </button>
+                            <time dateTime={taskRow().date}>{formatTaskDate(taskRow().date)}</time>
+                          </>
+                        )}
+                      </Match>
+                      <Match when={row.type === "RepeatingTask" && row}>
+                        {(repeatingTaskRow) => (
+                          <>
+                            <button type="button" onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: repeatingTaskRow().repeatingTaskId })}>
+                              {repeatingTaskRow().title || "Untitled"}
+                            </button>
+                            ↻
+                            <time dateTime={repeatingTaskRow().date}>{formatTaskDate(repeatingTaskRow().date)}</time>
+                          </>
+                        )}
+                      </Match>
+                    </Switch>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </main>
         </Match>
         <Match when={props.listMode === "Completed"}>
-          <ul>
-            <For each={completedRows(props.userData)}>
-              {(row) => (
-                <li>
-                  <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}>
-                    {row.title || "Untitled"}
-                  </button>
-                  <time dateTime={row.completedAt.toDate().toISOString()}>
-                    {formatDate(row.completedAt.toDate())}
-                  </time>
-                </li>
-              )}
-            </For>
-          </ul>
+          <main class="px-4 mx-auto w-full max-w-lg">
+            <ul class="px-4">
+              <For each={completedRows(props.userData)}>
+                {(row) => (
+                  <li>
+                    <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}>
+                      {row.title || "Untitled"}
+                    </button>
+                    <time dateTime={row.completedAt.toDate().toISOString()}>
+                      {formatDate(row.completedAt.toDate())}
+                    </time>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </main>
         </Match>
       </Switch>
     </div>
