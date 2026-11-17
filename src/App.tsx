@@ -59,8 +59,8 @@ function AppLoading() {
 type ListMode = "Schedule" | "Completed";
 type Selection = { type: "Task"; taskId: string; } | { type: "RepeatingTask"; repeatingTaskId: string; };
 type ScheduleRow =
-  | { type: "Task"; taskId: string; title: string; date: TaskDate; }
-  | { type: "RepeatingTask"; repeatingTaskId: string; title: string; date: TaskDate; };
+  | { type: "Task"; taskId: string; title: string; details: string; date: TaskDate; }
+  | { type: "RepeatingTask"; repeatingTaskId: string; title: string; details: string; date: TaskDate; };
 type CompletedRow = { taskId: string; title: string; completedAt: Timestamp; };
 
 function AppSignedIn(props: {
@@ -180,6 +180,7 @@ function List(props: {
                           <>
                             <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: taskRow().taskId })}>
                               {taskRow().title || "Untitled"}
+                              <Show when={taskRow().details.trim()}> • {taskRow().details}</Show>
                             </button>
                             <time dateTime={taskRow().date}>{formatTaskDate(taskRow().date)}</time>
                           </>
@@ -190,6 +191,7 @@ function List(props: {
                           <>
                             <button type="button" onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: repeatingTaskRow().repeatingTaskId })}>
                               {repeatingTaskRow().title || "Untitled"}
+                              <Show when={repeatingTaskRow().details.trim()}> • {repeatingTaskRow().details}</Show>
                             </button>
                             ↻
                             <time dateTime={repeatingTaskRow().date}>{formatTaskDate(repeatingTaskRow().date)}</time>
@@ -284,13 +286,13 @@ function scheduleRows(data: UserData): ScheduleRow[] {
   const taskRows: ScheduleRow[] = Object.entries(data.tasks)
     .flatMap(([taskId, task]) =>
       task.completedAt === null
-        ? [{ type: "Task", taskId, title: task.title, date: task.date }]
+        ? [{ type: "Task", taskId, title: task.title, details: task.details, date: task.date }]
         : []
     );
   const repeatingTaskRows: ScheduleRow[] = Object.entries(data.repeatingTasks)
     .flatMap(([repeatingTaskId, repeatingTask]) =>
       occurrenceDates(repeatingTask.schedule, taskDateOneYearFromToday())
-        .map((date) => ({ type: "RepeatingTask", repeatingTaskId, title: repeatingTask.title, date }))
+        .map((date) => ({ type: "RepeatingTask", repeatingTaskId, title: repeatingTask.title, details: repeatingTask.details, date }))
     );
   return [...taskRows, ...repeatingTaskRows].sort((left, right) => left.date.localeCompare(right.date));
 }
