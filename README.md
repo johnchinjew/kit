@@ -45,3 +45,18 @@ Client -> Cloudflare -> Firebase Hosting
   wait as long as practical, then migrate existing data and begin enforcing the new invariant. Breaking changes carry
   unavoidable risks: queued writes may be rejected, old clients may stop working correctly, old clients may reintroduce
   legacy data that conflicts with the new model, etc.
+
+## Known Issues
+
+- Date labels can remain stale when the app stays open across midnight.
+- Repeating occurrences become tasks only on the first data snapshot, so midnight rollover, newly created schedules, and
+  later synced schedules can require reopening the app.
+- Multiple devices processing the same repeating occurrence can create duplicate tasks.
+- Creating an occurrence task and advancing its schedule are separate writes, so partial failures can leave tasks
+  created without advancing the schedule.
+- Editor changes are lost if the app closes or reloads before the user presses Back or Complete.
+- Failed saves show an error after closing the editor, without preserving the draft for recovery.
+- Firestore rules validate selected timestamps but do not restrict writes to the intended fields or validate the schema
+  of incoming data.
+- Completed tasks are not yet automatically deleted after one year.
+- There is no recovery strategy for hitting the Firestore document size limit.
