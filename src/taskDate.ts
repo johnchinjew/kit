@@ -9,11 +9,16 @@ export function taskDateFromUtcDate(date: Date): TaskDate {
   return decodeTaskDate(date.toISOString().slice(0, 10));
 }
 
-export function formatTaskDate(date: TaskDate): string {
+export function formatTaskDate(date: TaskDate, today: TaskDate): string {
+  const daysFromToday = (utcDateFromTaskDate(date).getTime() - utcDateFromTaskDate(today).getTime()) / 86_400_000;
+  if (daysFromToday === -1) return "Yesterday";
+  if (daysFromToday === 0) return "Today";
+  if (daysFromToday === 1) return "Tomorrow";
+
   return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    year: date.slice(0, 4) === today.slice(0, 4) ? undefined : "numeric",
+    month: "short",
+    day: "numeric",
     timeZone: "UTC",
   }).format(utcDateFromTaskDate(date));
 }

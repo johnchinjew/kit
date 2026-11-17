@@ -5,7 +5,7 @@ import Button from "./components/Button";
 import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
-import { formatTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
+import { formatTaskDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "./taskDate";
 import { formatDate } from "./date";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn } from "./session";
@@ -182,7 +182,7 @@ function List(props: {
                               {taskRow().title || "Untitled"}
                               <Show when={taskRow().details.trim()}> • {taskRow().details}</Show>
                             </button>
-                            <time dateTime={taskRow().date}>{formatTaskDate(taskRow().date)}</time>
+                            <time dateTime={taskRow().date}>{formatTaskDate(taskRow().date, taskDateToday())}</time>
                           </>
                         )}
                       </Match>
@@ -194,7 +194,7 @@ function List(props: {
                               <Show when={repeatingTaskRow().details.trim()}> • {repeatingTaskRow().details}</Show>
                             </button>
                             ↻
-                            <time dateTime={repeatingTaskRow().date}>{formatTaskDate(repeatingTaskRow().date)}</time>
+                            <time dateTime={repeatingTaskRow().date}>{formatTaskDate(repeatingTaskRow().date, taskDateToday())}</time>
                           </>
                         )}
                       </Match>
