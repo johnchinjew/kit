@@ -168,7 +168,7 @@ export default function RepeatingTaskEditor(props: {
       <label class="grid gap-1 text-sm">
         <span class="px-4 text-foreground-muted">Details</span>
         <textarea
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base resize-y"
+          class="field-sizing-content min-h-[calc(4lh+1.25rem+2px)] w-full rounded-md border border-border bg-background px-4 py-2.5 text-base resize-y"
           rows="4"
           name="details"
           value={draft().details}
