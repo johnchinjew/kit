@@ -16,9 +16,6 @@ Just a to-do list.
 
 ## Architecture
 
-Kit is in pre-alpha. The compatibility and migration requirements below do not apply. Breaking changes are expected and
-do not require preserving compatibility with existing clients or data.
-
 ```
 Client -> Cloudflare -> Firebase Hosting
    |
