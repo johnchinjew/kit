@@ -254,7 +254,7 @@ it("keeps a newly created repeating task selected while waiting for its first sn
     scheduleEditedAt: Timestamp.now(),
   } } });
   expect(document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!.value).toBe("Days");
-  expect(document.querySelector("button")!.textContent).toBe("Back");
+  expect(document.querySelector("button")!.textContent).toBe("←");
 });
 
 it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft during live updates", (kind) => {
@@ -277,7 +277,7 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   const otherTitle = kind === "Task" ? "Repeating" : "Task";
   [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.querySelector("span:first-child")?.textContent === otherTitle)!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe(kind === "Task" ? "Repeating" : "Task");
-  [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Back")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
 
   const title = kind === "Task" ? "Task" : "Repeating";
   [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.querySelector("span:first-child")?.textContent === title)!.click();

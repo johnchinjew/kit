@@ -122,44 +122,64 @@ export default function TaskEditor(props: {
   }
 
   return (
-    <main>
-      <TextButton onClick={onClickBack}>
-        Back
-      </TextButton>
-      <input
-        name="title"
-        type="text"
-        value={draft().title}
-        readOnly={props.task.completedAt !== null}
-        onInput={onChangeTitle}
-      />
-      <textarea
-        name="details"
-        value={draft().details}
-        readOnly={props.task.completedAt !== null}
-        onInput={onChangeDetails}
-      />
-      <input
-        name="date"
-        type="date"
-        max={taskDateOneYearFromToday()}
-        value={draft().date}
-        readOnly={props.task.completedAt !== null}
-        onInput={onChangeDate}
-      />
-      <Show when={props.task.completedAt === null}>
-        <TextButton onClick={onClickComplete}>
-          Complete
+    <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <header class="flex items-center justify-between">
+        <div>
+          <TextButton onClick={onClickBack}>
+            ←
+          </TextButton>
+        </div>
+        <div>
+          <Show when={props.task.completedAt === null} fallback={
+            <TextButton onClick={onClickReopen}>
+              Reopen
+            </TextButton>
+          }>
+            <TextButton onClick={onClickComplete}>
+              Complete
+            </TextButton>
+          </Show>
+        </div>
+      </header>
+      <label class="grid gap-1 text-sm">
+        <span class="px-4">Title</span>
+        <input
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border font-semibold"
+          name="title"
+          type="text"
+          value={draft().title}
+          readOnly={props.task.completedAt !== null}
+          onInput={onChangeTitle}
+        />
+      </label>
+      <label class="grid gap-1 text-sm">
+        <span class="px-4">Details</span>
+        <textarea
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border resize-y"
+          rows="4"
+          name="details"
+          value={draft().details}
+          readOnly={props.task.completedAt !== null}
+          onInput={onChangeDetails}
+        />
+      </label>
+      <label class="grid gap-1 text-sm">
+        <span class="px-4">Date</span>
+        <input
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
+          name="date"
+          type="date"
+          max={taskDateOneYearFromToday()}
+          value={draft().date}
+          readOnly={props.task.completedAt !== null}
+          onInput={onChangeDate}
+        />
+      </label>
+      <div class="justify-self-end">
+        <TextButton onClick={onClickDelete}>
+          Delete
         </TextButton>
-      </Show>
-      <Show when={props.task.completedAt !== null}>
-        <TextButton onClick={onClickReopen}>
-          Reopen
-        </TextButton>
-      </Show>
-      <TextButton onClick={onClickDelete}>
-        Delete
-      </TextButton>
+      </div>
     </main>
   );
 }

@@ -148,49 +148,73 @@ export default function RepeatingTaskEditor(props: {
   }
 
   return (
-    <main>
-      <TextButton onClick={onClickBack}>
-        Back
-      </TextButton>
-      <input
-        name="title"
-        type="text"
-        value={draft().title}
-        onInput={onChangeTitle}
-      />
-      <textarea
-        name="details"
-        value={draft().details}
-        onInput={onChangeDetails}
-      />
-      <input
-        name="nextDate"
-        type="date"
-        max={taskDateOneYearFromToday()}
-        value={draft().schedule.nextDate}
-        onInput={onChangeNextDate}
-      />
-      <input
-        name="interval"
-        type="number"
-        min="1"
-        max={maxInterval(draft().schedule.intervalUnit)}
-        value={draft().schedule.interval}
-        onInput={onChangeInterval}
-      />
-      <select
-        name="intervalUnit"
-        value={draft().schedule.intervalUnit}
-        onChange={onChangeIntervalUnit}
-      >
-        <option value="Days">Days</option>
-        <option value="Weeks">Weeks</option>
-        <option value="Months">Months</option>
-        <option value="Years">Years</option>
-      </select>
-      <TextButton onClick={onClickDelete}>
-        Delete
-      </TextButton>
+    <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div class="justify-self-start">
+        <TextButton onClick={onClickBack}>
+          ←
+        </TextButton>
+      </div>
+      <label class="grid gap-1 text-sm">
+        <span class="px-4">Title</span>
+        <input
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base font-semibold"
+          name="title"
+          type="text"
+          value={draft().title}
+          onInput={onChangeTitle}
+        />
+      </label>
+      <label class="grid gap-1 text-sm">
+        <span class="px-4">Details</span>
+        <textarea
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base resize-y"
+          rows="4"
+          name="details"
+          value={draft().details}
+          onInput={onChangeDetails}
+        />
+      </label>
+      <label class="grid gap-1 text-sm">
+        <span class="px-4">Repeats next on</span>
+        <input
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+          name="nextDate"
+          type="date"
+          max={taskDateOneYearFromToday()}
+          value={draft().schedule.nextDate}
+          onInput={onChangeNextDate}
+        />
+      </label>
+      <fieldset>
+        <legend class="mb-1 px-4 text-sm">Repeats every</legend>
+        <div class="grid grid-cols-2 gap-2">
+          <input
+            class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+            name="interval"
+            type="number"
+            min="1"
+            max={maxInterval(draft().schedule.intervalUnit)}
+            value={draft().schedule.interval}
+            onInput={onChangeInterval}
+          />
+          <select
+            class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+            name="intervalUnit"
+            value={draft().schedule.intervalUnit}
+            onChange={onChangeIntervalUnit}
+          >
+            <option value="Days">Days</option>
+            <option value="Weeks">Weeks</option>
+            <option value="Months">Months</option>
+            <option value="Years">Years</option>
+          </select>
+        </div>
+      </fieldset>
+      <div class="justify-self-end">
+        <TextButton onClick={onClickDelete}>
+          Delete
+        </TextButton>
+      </div>
     </main>
   );
 }

@@ -39,7 +39,7 @@ it("edits a repeating task without offering task completion or conversion", () =
     onBack={onBack}
   />, document.body);
 
-  expect([...document.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["Back", "Delete"]);
+  expect([...document.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["←", "Delete"]);
   const date = document.querySelector<HTMLInputElement>('[name="nextDate"]')!;
   date.value = "2026-02-28";
   date.dispatchEvent(new Event("input", { bubbles: true }));
@@ -227,7 +227,7 @@ it.each([
   expect(nextOccurrenceDate(saved)).toBe(followingDate);
 });
 
-it.each(["Back"])("trims title and details when clicking %s", (action) => {
+it("trims title and details when clicking Back", () => {
   dispose = render(() => <RepeatingTaskEditor
       repeatingTaskId="first"
       repeatingTask={{ title: "Original", details: "Original", schedule: {
@@ -243,7 +243,7 @@ it.each(["Back"])("trims title and details when clicking %s", (action) => {
   details.value = " \n  Whole grain\nTwo loaves  \n ";
   details.dispatchEvent(new Event("input", { bubbles: true }));
   expect(title.value).toBe("  Buy  bread  ");
-  [...document.querySelectorAll("button")].find((button) => button.textContent === action)!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
 
   expect(setRepeatingTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy  bread");
   expect(setRepeatingTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Whole grain\nTwo loaves");

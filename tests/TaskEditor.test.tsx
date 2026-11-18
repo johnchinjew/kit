@@ -26,7 +26,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", (action) => {
+it.each(["←", "Reopen"])("keeps completed tasks read-only when clicking %s", (action) => {
   const onBack = vi.fn();
   dispose = render(() => (
     <TaskEditor
@@ -51,7 +51,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   details.value = "Changed details";
   details.dispatchEvent(new Event("input", { bubbles: true }));
   const buttons = [...document.querySelectorAll("button")];
-  expect(buttons.map((button) => button.textContent)).toEqual(["Back", "Reopen", "Delete"]);
+  expect(buttons.map((button) => button.textContent)).toEqual(["←", "Reopen", "Delete"]);
   buttons.find((button) => button.textContent === action)!.click();
 
   expect(setTaskDetails).not.toHaveBeenCalled();
@@ -66,7 +66,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   }
 });
 
-it.each(["Back", "Complete"])("saves edits to incomplete tasks when clicking %s", (action) => {
+it.each(["←", "Complete"])("saves edits to incomplete tasks when clicking %s", (action) => {
   dispose = render(() => (
     <TaskEditor
       taskId="first"
@@ -124,7 +124,7 @@ it("does not save a draft if the task is completed on another device", () => {
   expect(input.readOnly).toBe(true);
   expect(date.readOnly).toBe(true);
   expect(details.readOnly).toBe(true);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
 
   expect(setTaskDetails).not.toHaveBeenCalled();
   expect(setTaskTitle).not.toHaveBeenCalled();
@@ -147,14 +147,14 @@ it("prevents saving a cleared task date", () => {
   const date = document.querySelector<HTMLInputElement>('input[name="date"]')!;
   date.value = "";
   date.dispatchEvent(new Event("input", { bubbles: true }));
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
 
   expect(setTaskDate).not.toHaveBeenCalled();
   expect(onBack).not.toHaveBeenCalled();
   expect(showNotice).toHaveBeenCalledExactlyOnceWith("A date is required.");
 });
 
-it.each(["Back", "Complete"])("rejects dates beyond one year when clicking %s", (action) => {
+it.each(["←", "Complete"])("rejects dates beyond one year when clicking %s", (action) => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(2026, 9, 4, 12));
   const showNotice = vi.fn();
@@ -206,7 +206,7 @@ it.each(["title", "date", "details"] as const)("saves only the edited %s when th
   setTask(field === "title"
     ? { title: "Buy bread", details: "Remote details", completedAt: null, date: decodeTaskDate("2026-10-06") }
     : { title: "Buy milk", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "Back")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
 
   if (field === "title") {
     expect(setTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy eggs");
@@ -275,7 +275,7 @@ it("reports a failed deletion", async () => {
   expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not delete task. Try again later.");
 });
 
-it.each(["Back", "Complete"])("trims title and details when clicking %s", (action) => {
+it.each(["←", "Complete"])("trims title and details when clicking %s", (action) => {
   dispose = render(() => <TaskEditor
       taskId="first"
       task={{ title: "Original", details: "Original", date: decodeTaskDate("2026-10-04"), completedAt: null }}
