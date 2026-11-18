@@ -85,6 +85,7 @@ export default function RepeatingTaskEditor(props: {
   };
 
   const onClickDelete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    if (!window.confirm("Delete this repeating task?")) return;
     void deleteRepeatingTask(props.session.user.userId, props.repeatingTaskId).catch(() => {
       props.showNotice("Could not delete repeating task. Try again later.");
     });

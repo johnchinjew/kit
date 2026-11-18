@@ -75,6 +75,7 @@ export default function TaskEditor(props: {
   };
 
   const onClickDelete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+    if (!window.confirm("Delete this task?")) return;
     void deleteTask(props.session.user.userId, props.taskId).catch(() => {
       props.showNotice("Could not delete task. Try again later.");
     });

@@ -23,6 +23,7 @@ afterEach(() => {
   dispose?.();
   document.body.replaceChildren();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -241,6 +242,7 @@ it("can clear details and reports a failed save", async () => {
 });
 
 it.each(["incomplete", "completed"])("deletes a %s task without saving its draft", (state) => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   const task: Task = {
     title: "Rent", details: "Pay", date: decodeTaskDate("2026-01-31"),
     completedAt: state === "completed" ? Timestamp.now() : null,
@@ -256,6 +258,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
   date.value = "";
   date.dispatchEvent(new Event("input", { bubbles: true }));
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete this task?");
   expect(deleteTask).toHaveBeenCalledExactlyOnceWith("alice", "first");
   expect(setTaskTitle).not.toHaveBeenCalled();
   expect(setTaskDetails).not.toHaveBeenCalled();
@@ -264,6 +267,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
 });
 
 it("reports a failed deletion", async () => {
+  vi.spyOn(window, "confirm").mockReturnValue(true);
   const showNotice = vi.fn();
   vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Delete failed"));
   dispose = render(() => <TaskEditor taskId="first"
@@ -273,6 +277,21 @@ it("reports a failed deletion", async () => {
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
   await Promise.resolve();
   expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not delete task. Try again later.");
+});
+
+it("does not delete a task when deletion is canceled", () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const onBack = vi.fn();
+  dispose = render(() => <TaskEditor taskId="first"
+    task={{ title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+    session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
+    showNotice={vi.fn()} onBack={onBack} />, document.body);
+
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+
+  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete this task?");
+  expect(deleteTask).not.toHaveBeenCalled();
+  expect(onBack).not.toHaveBeenCalled();
 });
 
 it.each(["←", "Complete"])("trims title and details when clicking %s", (action) => {

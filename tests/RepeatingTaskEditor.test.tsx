@@ -21,6 +21,36 @@ afterEach(() => {
   dispose?.();
   document.body.replaceChildren();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
+});
+
+it.each([true, false])("deletes a repeating task only when confirmation is accepted=%s", (confirmed) => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(confirmed);
+  const onBack = vi.fn();
+  dispose = render(() => <RepeatingTaskEditor
+    repeatingTaskId="rent"
+    repeatingTask={{
+      title: "Rent", details: "Pay landlord",
+      schedule: {
+        nextDate: decodeTaskDate("2026-01-31"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-01-31"),
+      },
+      scheduleEditedAt: Timestamp.now(),
+    }}
+    session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
+    showNotice={vi.fn()}
+    onBack={onBack}
+  />, document.body);
+
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
+
+  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete this repeating task?");
+  if (confirmed) {
+    expect(deleteRepeatingTask).toHaveBeenCalledExactlyOnceWith("alice", "rent");
+    expect(onBack).toHaveBeenCalledOnce();
+  } else {
+    expect(deleteRepeatingTask).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
+  }
 });
 
 it("edits a repeating task without offering task completion or conversion", () => {
