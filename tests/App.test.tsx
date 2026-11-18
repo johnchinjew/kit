@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 import { Timestamp } from "firebase/firestore";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../src/App";
+import { createSession, type Session } from "../src/session";
 import { decodeTaskDate } from "../src/taskDate";
 import { createRepeatingTask, createTasksFromRepeatingTasks, createTask, subscribeUserData, type UserData } from "../src/userData";
 
 vi.mock("../src/session", () => ({
-  createSession: () => ({
+  createSession: vi.fn(() => ({
     session: () => ({ status: "SignedIn", user: { userId: "alice", photoUrl: null } }),
     signIn: vi.fn(),
     signOut: vi.fn(),
-  }),
+  })),
 }));
 
 vi.mock("../src/userData", async (importOriginal) => ({
@@ -37,18 +39,26 @@ afterEach(() => {
   dispose = undefined;
   document.body.replaceChildren();
   vi.useRealTimers();
-  vi.unstubAllEnvs();
 });
 
-it.each([
-  { mode: "emulator", showBanner: false },
-  { mode: "production", showBanner: true },
-])("hides the work-in-progress notice in emulator mode ($mode)", ({ mode, showBanner }) => {
-  vi.stubEnv("MODE", mode);
+it("only shows the pre-alpha notice on the sign-in screen", () => {
+  const [session, setSession] = createSignal<Session>({ status: "CheckingAuth" });
+  vi.mocked(createSession).mockReturnValueOnce({ session, signIn: vi.fn(), signOut: vi.fn() });
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
 
-  expect(document.body.textContent?.includes("This is a work in progress demo and may contain bugs!")).toBe(showBanner);
+  const message = "Kit is in pre-alpha.";
+  expect(document.body.textContent).not.toContain(message);
+
+  setSession({ status: "SignedOut" });
+  expect(document.body.textContent).toContain(message);
+  const feedbackLink = document.querySelector<HTMLAnchorElement>("main a");
+  expect(feedbackLink?.textContent).toBe("open an issue");
+  expect(feedbackLink?.getAttribute("href")).toBe("https://github.com/johnchinjew/kit/issues");
+
+  setSession({ status: "SignedIn", user: { userId: "alice", photoUrl: null } });
+  expect(document.body.textContent).not.toContain(message);
+  expect(feedbackLink?.isConnected).toBe(false);
 });
 
 it.each([false, true])("only processes the first snapshot, with initial due tasks=%s", async (initiallyDue) => {

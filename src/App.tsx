@@ -21,10 +21,6 @@ export default function App() {
   const { notice, showNotice } = createNotice();
   const { session, signIn, signOut } = createSession(showNotice);
 
-  if (import.meta.env.MODE !== "emulator") {
-    showNotice("This is a work in progress demo and may contain bugs!");
-  }
-
   return (
     <>
       <Switch>
@@ -422,6 +418,9 @@ function Editor(props: {
 function AppSignedOut(props: { signIn: () => void; }) {
   return (
     <main class="p-4 mx-auto w-full max-w-lg">
+      <p class="mb-4 px-4 py-2.5 text-foreground">
+        Kit is in pre-alpha. Try it out! But serious bugs, including data loss, are possible. To share feedback, <a class="underline" href="https://github.com/johnchinjew/kit/issues">open an issue</a>.
+      </p>
       <Button onClick={props.signIn}>
         Sign in with Google
       </Button>
