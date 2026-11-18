@@ -5,8 +5,7 @@ import Button from "./components/Button";
 import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
-import { formatTaskDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "./taskDate";
-import { formatDate } from "./date";
+import { formatTaskDate, taskDateFromDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "./taskDate";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn } from "./session";
 import {
@@ -204,16 +203,15 @@ function List(props: {
         </Match>
         <Match when={props.listMode === "Completed"}>
           <main class="px-4 mx-auto w-full max-w-lg">
-            <ul class="px-4">
+            <ul class="divide-y divide-border px-4">
               <For each={completedRows(props.userData)}>
                 {(row) => (
-                  <li>
-                    <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}>
-                      {row.title || "Untitled"}
-                    </button>
-                    <time dateTime={row.completedAt.toDate().toISOString()}>
-                      {formatDate(row.completedAt.toDate())}
-                    </time>
+                  <li class="py-4 first:pt-0 last:pb-0">
+                    <CompletedTaskRow
+                      title={row.title}
+                      completedAt={row.completedAt}
+                      onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+                    />
                   </li>
                 )}
               </For>
@@ -348,6 +346,28 @@ function RepeatingTaskRow(props: {
       <Show when={props.details}>
         <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
       </Show>
+    </button>
+  );
+}
+
+function CompletedTaskRow(props: {
+  title: string;
+  completedAt: Timestamp;
+  onClick: () => void;
+}) {
+  const completedDate = () => props.completedAt.toDate();
+  return (
+    <button
+      class="grid w-full grid-cols-1 text-left cursor-pointer"
+      type="button"
+      onClick={props.onClick}
+    >
+      <span class="truncate line-through" classList={{ "text-foreground-muted": !props.title }}>
+        {props.title || "Empty title"}
+      </span>
+      <time class="truncate text-sm text-foreground-muted" dateTime={completedDate().toISOString()}>
+        Completed {formatTaskDate(taskDateFromDate(completedDate()), taskDateToday())}
+      </time>
     </button>
   );
 }

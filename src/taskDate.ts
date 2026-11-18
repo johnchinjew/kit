@@ -24,8 +24,11 @@ export function formatTaskDate(date: TaskDate, today: TaskDate): string {
 }
 
 export function taskDateToday(): TaskDate {
-  const now = new Date();
-  return decodeTaskDate(`${String(now.getFullYear()).padStart(4, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+  return taskDateFromDate(new Date());
+}
+
+export function taskDateFromDate(date: Date): TaskDate {
+  return decodeTaskDate(`${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
 }
 
 export function taskDateOneYearFromToday(): TaskDate {

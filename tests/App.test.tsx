@@ -4,7 +4,6 @@ import { render } from "solid-js/web";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { decodeTaskDate } from "../src/taskDate";
-import { formatDate } from "../src/date";
 import { createRepeatingTask, createTasksFromRepeatingTasks, createTask, subscribeUserData, type UserData } from "../src/userData";
 
 vi.mock("../src/session", () => ({
@@ -115,7 +114,7 @@ it("orders completed tasks by completion instant and displays completion dates",
     onUserData({ tasks: {
       older: { title: "Older", details: "", date: decodeTaskDate("2026-10-08"), completedAt: older },
       newer: { title: "Newer", details: "", date: decodeTaskDate("2026-10-07"), completedAt: newer },
-      newest: { title: "Newest", details: "", date: decodeTaskDate("2026-10-09"), completedAt: newest },
+      newest: { title: "Newest", details: "Finished the report", date: decodeTaskDate("2026-10-09"), completedAt: newest },
       later: { title: "Later", details: "", completedAt: null, date: decodeTaskDate("2026-10-06") },
       earlier: { title: "Earlier", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") },
     }, repeatingTasks: {} });
@@ -131,10 +130,31 @@ it("orders completed tasks by completion instant and displays completion dates",
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
   const rows = [...document.querySelectorAll("li")];
-  expect(rows.map((row) => row.querySelector("button")!.textContent)).toEqual(["Newest", "Newer", "Older"]);
+  expect(rows.map((row) => row.querySelector("button > span:first-child")!.textContent)).toEqual(["Newest", "Newer", "Older"]);
+  expect(rows[0]!.textContent).not.toContain("Finished the report");
   expect(rows[1]!.querySelector("time")!.getAttribute("datetime")).toBe(newer.toDate().toISOString());
-  expect(rows[1]!.querySelector("time")!.textContent).toBe(formatDate(newer.toDate()));
+  expect(rows[1]!.querySelector("time")!.textContent).toBe("Completed Oct 5");
   expect(rows[2]!.querySelector("time")!.getAttribute("datetime")).toBe(older.toDate().toISOString());
+});
+
+it.each([
+  { day: 4, label: "Today" },
+  { day: 3, label: "Yesterday" },
+])("shows completed tasks with a $label label", ({ day, label }) => {
+  const completedAt = Timestamp.fromDate(new Date(2026, 10, day, 23, 30));
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData({ tasks: {
+      done: { title: "Done", details: "", date: decodeTaskDate("2026-10-01"), completedAt },
+    }, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Completed";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  expect(document.querySelector("li time")!.textContent).toBe(`Completed ${label}`);
+  expect(document.querySelector("li time")!.getAttribute("datetime")).toBe(completedAt.toDate().toISOString());
 });
 
 it.each([false, true])("returns to the list when the open task with completed=%s is deleted remotely", (completed) => {
@@ -159,7 +179,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   expect(document.querySelector('[name="title"]')).toBeNull();
   expect(document.body.textContent).not.toContain("Loading task");
   expect(document.querySelector("select")!.value).toBe(completed ? "Completed" : "Schedule");
-  expect(document.querySelector(completed ? "li button" : "li button > span:first-child")!.textContent).toBe("Remaining task");
+  expect(document.querySelector("li button > span:first-child")!.textContent).toBe("Remaining task");
   document.querySelector<HTMLButtonElement>("li button")!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("Remaining task");
   expect(subscribeUserData).toHaveBeenCalledTimes(1);

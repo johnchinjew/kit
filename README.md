@@ -52,6 +52,8 @@ Client -> Cloudflare -> Firebase Hosting
 - Repeating occurrences become tasks only on the first data snapshot, so midnight rollover, newly created schedules, and
   later synced schedules can require reopening the app.
 - Multiple devices processing the same repeating occurrence can create duplicate tasks.
+- Recurrence generation uses each device's local date. A device already on tomorrow can generate an occurrence before
+  another device reaches that day.
 - Creating an occurrence task and advancing its schedule are separate writes, so partial failures can leave tasks
   created without advancing the schedule.
 - Editor changes are lost if the app closes or reloads before the user presses Back or Complete.
