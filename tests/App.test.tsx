@@ -123,7 +123,7 @@ it("orders completed tasks by completion instant and displays completion dates",
   });
   dispose = render(() => <App />, document.body);
 
-  expect([...document.querySelectorAll("li button")].map((button) => button.textContent)).toEqual(["Earlier", "Later"]);
+  expect([...document.querySelectorAll("li button > span:first-child")].map((title) => title.textContent)).toEqual(["Earlier", "Later"]);
   expect([...document.querySelectorAll("li time")].map((time) => time.getAttribute("datetime"))).toEqual(["2026-10-04", "2026-10-06"]);
 
   const select = document.querySelector("select")!;
@@ -159,7 +159,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   expect(document.querySelector('[name="title"]')).toBeNull();
   expect(document.body.textContent).not.toContain("Loading task");
   expect(document.querySelector("select")!.value).toBe(completed ? "Completed" : "Schedule");
-  expect(document.querySelector("li button")!.textContent).toBe("Remaining task");
+  expect(document.querySelector(completed ? "li button" : "li button > span:first-child")!.textContent).toBe("Remaining task");
   document.querySelector<HTMLButtonElement>("li button")!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("Remaining task");
   expect(subscribeUserData).toHaveBeenCalledTimes(1);
@@ -203,7 +203,7 @@ it("projects a repeating task separately from its generated tasks", () => {
   const rows = [...document.querySelectorAll("li")];
   expect(rows.length).toBeGreaterThan(2);
   expect(rows.length).toBeLessThanOrEqual(53);
-  expect(rows.slice(0, 2).map((row) => row.querySelector("button")!.textContent)).toEqual(["Rent", "Rent"]);
+  expect(rows.slice(0, 2).map((row) => row.querySelector("button > span:first-child")!.textContent)).toEqual(["Rent", "Rent"]);
   expect(rows.slice(0, 2).map((row) => row.querySelector("time")!.getAttribute("datetime"))).toEqual([
     "2026-11-05", "2026-11-12",
   ]);
@@ -255,12 +255,12 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   dispose = render(() => <App />, document.body);
 
   const otherTitle = kind === "Task" ? "Repeating" : "Task";
-  [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.textContent === otherTitle)!.click();
+  [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.querySelector("span:first-child")?.textContent === otherTitle)!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe(kind === "Task" ? "Repeating" : "Task");
   [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Back")!.click();
 
   const title = kind === "Task" ? "Task" : "Repeating";
-  [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.textContent === title)!.click();
+  [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.querySelector("span:first-child")?.textContent === title)!.click();
   const input = document.querySelector<HTMLInputElement>('[name="title"]')!;
   expect(input.value).toBe(kind === "Task" ? "Task" : "Repeating");
   expect(document.querySelector('[name="intervalUnit"]') !== null).toBe(kind === "RepeatingTask");
@@ -302,7 +302,7 @@ it("sorts tasks and repeating rows together and excludes completed tasks", () =>
   });
   dispose = render(() => <App />, document.body);
 
-  expect([...document.querySelectorAll("li button")].map((button) => button.textContent)).toEqual(["Earlier", "Yearly", "Later"]);
+  expect([...document.querySelectorAll("li button > span:first-child")].map((title) => title.textContent)).toEqual(["Earlier", "Yearly", "Later"]);
   expect([...document.querySelectorAll("li time")].map((time) => time.getAttribute("datetime"))).toEqual([
     "2026-11-04", "2026-11-05", "2026-11-06",
   ]);

@@ -170,32 +170,29 @@ function List(props: {
       <Switch>
         <Match when={props.listMode === "Schedule"}>
           <main class="px-4 mx-auto w-full max-w-lg">
-            <ul class="px-4">
+            <ul class="divide-y divide-border px-4">
               <For each={scheduleRows(props.userData)}>
                 {(row) => (
-                  <li>
+                  <li class="py-4 first:pt-0 last:pb-0">
                     <Switch>
                       <Match when={row.type === "Task" && row}>
                         {(taskRow) => (
-                          <>
-                            <button type="button" onClick={() => props.setSelected({ type: "Task", taskId: taskRow().taskId })}>
-                              {taskRow().title || "Untitled"}
-                              <Show when={taskRow().details.trim()}> • {taskRow().details}</Show>
-                            </button>
-                            <time dateTime={taskRow().date}>{formatTaskDate(taskRow().date, taskDateToday())}</time>
-                          </>
+                          <TaskRow
+                            title={taskRow().title}
+                            details={taskRow().details}
+                            date={taskRow().date}
+                            onClick={() => props.setSelected({ type: "Task", taskId: taskRow().taskId })}
+                          />
                         )}
                       </Match>
                       <Match when={row.type === "RepeatingTask" && row}>
                         {(repeatingTaskRow) => (
-                          <>
-                            <button type="button" onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: repeatingTaskRow().repeatingTaskId })}>
-                              {repeatingTaskRow().title || "Untitled"}
-                              <Show when={repeatingTaskRow().details.trim()}> • {repeatingTaskRow().details}</Show>
-                            </button>
-                            ↻
-                            <time dateTime={repeatingTaskRow().date}>{formatTaskDate(repeatingTaskRow().date, taskDateToday())}</time>
-                          </>
+                          <RepeatingTaskRow
+                            title={repeatingTaskRow().title}
+                            details={repeatingTaskRow().details}
+                            date={repeatingTaskRow().date}
+                            onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: repeatingTaskRow().repeatingTaskId })}
+                          />
                         )}
                       </Match>
                     </Switch>
@@ -254,18 +251,6 @@ function MenuBar(props: {
   );
 }
 
-function ActionBar(props: {
-  addTask: () => void;
-  addRepeatingTask: () => void;
-}) {
-  return (
-    <div class="order-last sticky bottom-0 mt-auto mx-auto w-full max-w-lg flex gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-      <Button onClick={props.addTask}>＋ Task</Button>
-      <Button onClick={props.addRepeatingTask}>＋ Repeating Task</Button>
-    </div>
-  );
-}
-
 function SignOutButton(props: { photoUrl: string | null; signOut: () => void; }) {
   return (
     <button
@@ -279,6 +264,18 @@ function SignOutButton(props: { photoUrl: string | null; signOut: () => void; })
         alt="Profile photo"
       />
     </button>
+  );
+}
+
+function ActionBar(props: {
+  addTask: () => void;
+  addRepeatingTask: () => void;
+}) {
+  return (
+    <div class="order-last sticky bottom-0 mt-auto mx-auto w-full max-w-lg flex gap-x-2 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-linear-to-b from-transparent to-background to-50%">
+      <Button onClick={props.addTask}>＋ Task</Button>
+      <Button onClick={props.addRepeatingTask}>＋ Repeating Task</Button>
+    </div>
   );
 }
 
@@ -305,6 +302,54 @@ function completedRows(data: UserData): CompletedRow[] {
         : [{ taskId, title: task.title, completedAt: task.completedAt }]
     )
     .sort((left, right) => right.completedAt.seconds - left.completedAt.seconds || right.completedAt.nanoseconds - left.completedAt.nanoseconds);
+}
+
+function TaskRow(props: {
+  title: string;
+  details: string;
+  date: TaskDate;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 text-left cursor-pointer"
+      type="button"
+      onClick={props.onClick}
+    >
+      <span class="truncate" classList={{ "text-foreground-muted": !props.title }}>
+        {props.title || "Empty title"}
+      </span>
+      <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+      <Show when={props.details}>
+        <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
+      </Show>
+    </button>
+  );
+}
+
+function RepeatingTaskRow(props: {
+  title: string;
+  details: string;
+  date: TaskDate;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 text-left cursor-pointer"
+      type="button"
+      onClick={props.onClick}
+    >
+      <span class="truncate" classList={{ "text-foreground-muted": !props.title }}>
+        {props.title || "Empty title"}
+      </span>
+      <span>
+        ↻ <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+      </span>
+      <Show when={props.details}>
+        <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
+      </Show>
+    </button>
+  );
 }
 
 // SIGNED IN EDITOR
