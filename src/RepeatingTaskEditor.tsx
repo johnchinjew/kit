@@ -178,7 +178,7 @@ export default function RepeatingTaskEditor(props: {
       <label class="grid gap-1 text-sm">
         <span class="px-4 text-foreground-muted">Repeats next on</span>
         <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+          class="w-auto justify-self-stretch rounded-md border border-border bg-background px-4 py-2.5 text-base"
           name="nextDate"
           type="date"
           max={taskDateOneYearFromToday()}

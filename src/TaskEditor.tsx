@@ -167,7 +167,7 @@ export default function TaskEditor(props: {
       <label class="grid gap-1 text-sm">
         <span class="px-4 text-foreground-muted">Date</span>
         <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
+          class="w-auto justify-self-stretch rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
           name="date"
           type="date"
           max={taskDateOneYearFromToday()}
