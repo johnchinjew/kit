@@ -92,16 +92,18 @@ export default function RepeatingTaskEditor(props: {
   };
 
   function saveTitle() {
-    if (draft().title !== initialRepeatingTask.title) {
-      void setRepeatingTaskTitle(props.session.user.userId, props.repeatingTaskId, draft().title).catch(() => {
+    const title = draft().title.trim();
+    if (title !== initialRepeatingTask.title) {
+      void setRepeatingTaskTitle(props.session.user.userId, props.repeatingTaskId, title).catch(() => {
         props.showNotice("Could not save repeating task. Try again later.");
       });
     }
   }
 
   function saveDetails() {
-    if (draft().details !== initialRepeatingTask.details) {
-      void setRepeatingTaskDetails(props.session.user.userId, props.repeatingTaskId, draft().details).catch(() => {
+    const details = draft().details.trim();
+    if (details !== initialRepeatingTask.details) {
+      void setRepeatingTaskDetails(props.session.user.userId, props.repeatingTaskId, details).catch(() => {
         props.showNotice("Could not save repeating task. Try again later.");
       });
     }

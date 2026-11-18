@@ -274,3 +274,23 @@ it("reports a failed deletion", async () => {
   await Promise.resolve();
   expect(showNotice).toHaveBeenCalledExactlyOnceWith("Could not delete task. Try again later.");
 });
+
+it.each(["Back", "Complete"])("trims title and details when clicking %s", (action) => {
+  dispose = render(() => <TaskEditor
+      taskId="first"
+      task={{ title: "Original", details: "Original", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
+      showNotice={vi.fn()} onBack={vi.fn()} />, document.body);
+
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  const details = document.querySelector<HTMLTextAreaElement>('[name="details"]')!;
+  title.value = "  Buy  bread  ";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+  details.value = " \n  Whole grain\nTwo loaves  \n ";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(title.value).toBe("  Buy  bread  ");
+  [...document.querySelectorAll("button")].find((button) => button.textContent === action)!.click();
+
+  expect(setTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy  bread");
+  expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Whole grain\nTwo loaves");
+});

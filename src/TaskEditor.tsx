@@ -82,16 +82,18 @@ export default function TaskEditor(props: {
   };
 
   function saveTitle() {
-    if (props.task.completedAt === null && draft().title !== initialTask.title) {
-      void setTaskTitle(props.session.user.userId, props.taskId, draft().title).catch(() => {
+    const title = draft().title.trim();
+    if (props.task.completedAt === null && title !== initialTask.title) {
+      void setTaskTitle(props.session.user.userId, props.taskId, title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }
   }
 
   function saveDetails() {
-    if (props.task.completedAt === null && draft().details !== initialTask.details) {
-      void setTaskDetails(props.session.user.userId, props.taskId, draft().details).catch(() => {
+    const details = draft().details.trim();
+    if (props.task.completedAt === null && details !== initialTask.details) {
+      void setTaskDetails(props.session.user.userId, props.taskId, details).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
     }

@@ -226,3 +226,25 @@ it.each([
   const saved = vi.mocked(setRepeatingTaskSchedule).mock.calls[0]![2];
   expect(nextOccurrenceDate(saved)).toBe(followingDate);
 });
+
+it.each(["Back"])("trims title and details when clicking %s", (action) => {
+  dispose = render(() => <RepeatingTaskEditor
+      repeatingTaskId="first"
+      repeatingTask={{ title: "Original", details: "Original", schedule: {
+        nextDate: decodeTaskDate("2026-10-04"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-10-04"),
+      }, scheduleEditedAt: Timestamp.now() }}
+      session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
+      showNotice={vi.fn()} onBack={vi.fn()} />, document.body);
+
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  const details = document.querySelector<HTMLTextAreaElement>('[name="details"]')!;
+  title.value = "  Buy  bread  ";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+  details.value = " \n  Whole grain\nTwo loaves  \n ";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(title.value).toBe("  Buy  bread  ");
+  [...document.querySelectorAll("button")].find((button) => button.textContent === action)!.click();
+
+  expect(setRepeatingTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy  bread");
+  expect(setRepeatingTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Whole grain\nTwo loaves");
+});
