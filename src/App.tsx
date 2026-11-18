@@ -285,7 +285,9 @@ function scheduleRows(data: UserData): ScheduleRow[] {
       occurrenceDates(repeatingTask.schedule, taskDateOneYearFromToday())
         .map((date) => ({ type: "RepeatingTask", repeatingTaskId, title: repeatingTask.title, details: repeatingTask.details, date }))
     );
-  return [...taskRows, ...repeatingTaskRows].sort((left, right) => left.date.localeCompare(right.date));
+  return [...taskRows, ...repeatingTaskRows].sort((left, right) =>
+    left.date.localeCompare(right.date) || left.title.localeCompare(right.title)
+  );
 }
 
 function completedRows(data: UserData): CompletedRow[] {
