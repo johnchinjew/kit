@@ -142,9 +142,9 @@ export default function TaskEditor(props: {
         </div>
       </header>
       <label class="grid gap-1 text-sm">
-        <span class="px-4">Title</span>
+        <span class="px-4 text-foreground-muted">Title</span>
         <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border font-semibold"
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
           name="title"
           type="text"
           value={draft().title}
@@ -153,7 +153,7 @@ export default function TaskEditor(props: {
         />
       </label>
       <label class="grid gap-1 text-sm">
-        <span class="px-4">Details</span>
+        <span class="px-4 text-foreground-muted">Details</span>
         <textarea
           class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border resize-y"
           rows="4"
@@ -164,7 +164,7 @@ export default function TaskEditor(props: {
         />
       </label>
       <label class="grid gap-1 text-sm">
-        <span class="px-4">Date</span>
+        <span class="px-4 text-foreground-muted">Date</span>
         <input
           class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
           name="date"

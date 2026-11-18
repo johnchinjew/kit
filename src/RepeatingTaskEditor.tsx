@@ -155,9 +155,9 @@ export default function RepeatingTaskEditor(props: {
         </TextButton>
       </div>
       <label class="grid gap-1 text-sm">
-        <span class="px-4">Title</span>
+        <span class="px-4 text-foreground-muted">Title</span>
         <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base font-semibold"
+          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
           name="title"
           type="text"
           value={draft().title}
@@ -165,7 +165,7 @@ export default function RepeatingTaskEditor(props: {
         />
       </label>
       <label class="grid gap-1 text-sm">
-        <span class="px-4">Details</span>
+        <span class="px-4 text-foreground-muted">Details</span>
         <textarea
           class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base resize-y"
           rows="4"
@@ -175,7 +175,7 @@ export default function RepeatingTaskEditor(props: {
         />
       </label>
       <label class="grid gap-1 text-sm">
-        <span class="px-4">Repeats next on</span>
+        <span class="px-4 text-foreground-muted">Repeats next on</span>
         <input
           class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
           name="nextDate"
@@ -186,7 +186,7 @@ export default function RepeatingTaskEditor(props: {
         />
       </label>
       <fieldset>
-        <legend class="mb-1 px-4 text-sm">Repeats every</legend>
+        <legend class="mb-1 px-4 text-sm text-foreground-muted">Repeats every</legend>
         <div class="grid grid-cols-2 gap-2">
           <input
             class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
