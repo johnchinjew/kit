@@ -51,12 +51,8 @@ function AppLoading() {
 
 // SIGNED IN
 
-type ListMode = "Schedule" | "Completed";
+type ListMode = "Schedule" | "Open" | "Completed";
 type Selection = { type: "Task"; taskId: string; } | { type: "RepeatingTask"; repeatingTaskId: string; };
-type ScheduleRow =
-  | { type: "Task"; taskId: string; title: string; details: string; date: TaskDate; }
-  | { type: "RepeatingTask"; repeatingTaskId: string; title: string; details: string; date: TaskDate; };
-type CompletedRow = { taskId: string; title: string; completedAt: Timestamp; };
 
 function AppSignedIn(props: {
   session: SignedIn;
@@ -159,60 +155,17 @@ function List(props: {
         signOut={props.signOut}
         setListMode={props.setListMode}
       />
-      <Show when={props.listMode === "Schedule"}>
-        <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
-      </Show>
       <Switch>
         <Match when={props.listMode === "Schedule"}>
-          <main class="px-4 mx-auto w-full max-w-lg">
-            <ul class="divide-y divide-border px-4">
-              <For each={scheduleRows(props.userData)}>
-                {(row) => (
-                  <li class="py-4 first:pt-0 last:pb-0">
-                    <Switch>
-                      <Match when={row.type === "Task" && row}>
-                        {(taskRow) => (
-                          <TaskRow
-                            title={taskRow().title}
-                            details={taskRow().details}
-                            date={taskRow().date}
-                            onClick={() => props.setSelected({ type: "Task", taskId: taskRow().taskId })}
-                          />
-                        )}
-                      </Match>
-                      <Match when={row.type === "RepeatingTask" && row}>
-                        {(repeatingTaskRow) => (
-                          <RepeatingTaskRow
-                            title={repeatingTaskRow().title}
-                            details={repeatingTaskRow().details}
-                            date={repeatingTaskRow().date}
-                            onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: repeatingTaskRow().repeatingTaskId })}
-                          />
-                        )}
-                      </Match>
-                    </Switch>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </main>
+          <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
+          <ScheduleList userData={props.userData} setSelected={props.setSelected} />
+        </Match>
+        <Match when={props.listMode === "Open"}>
+          <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
+          <OpenList userData={props.userData} setSelected={props.setSelected} />
         </Match>
         <Match when={props.listMode === "Completed"}>
-          <main class="px-4 mx-auto w-full max-w-lg">
-            <ul class="divide-y divide-border px-4">
-              <For each={completedRows(props.userData)}>
-                {(row) => (
-                  <li class="py-4 first:pt-0 last:pb-0">
-                    <CompletedTaskRow
-                      title={row.title}
-                      completedAt={row.completedAt}
-                      onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
-                    />
-                  </li>
-                )}
-              </For>
-            </ul>
-          </main>
+          <CompletedList userData={props.userData} setSelected={props.setSelected} />
         </Match>
       </Switch>
     </div>
@@ -232,10 +185,11 @@ function MenuBar(props: {
         value={props.listMode}
         onChange={(event) => {
           const mode = event.currentTarget.value;
-          if (mode === "Schedule" || mode === "Completed") props.setListMode(mode);
+          if (mode === "Schedule" || mode === "Open" || mode === "Completed") props.setListMode(mode);
         }}
       >
         <option value="Schedule">Schedule</option>
+        <option value="Open">Open</option>
         <option value="Completed">Completed</option>
       </select>
       <div class="col-start-3 justify-self-end">
@@ -273,6 +227,43 @@ function ActionBar(props: {
   );
 }
 
+type ScheduleRow =
+  | { type: "Task"; taskId: string; title: string; details: string; date: TaskDate; }
+  | { type: "RepeatingTask"; repeatingTaskId: string; title: string; details: string; date: TaskDate; };
+
+function ScheduleList(props: {
+  userData: UserData;
+  setSelected: (selection: Selection) => void;
+}) {
+  return (
+    <main class="px-4 mx-auto w-full max-w-lg">
+      <ul class="divide-y divide-border px-4">
+        <For each={scheduleRows(props.userData)}>
+          {(row) => (
+            <li class="py-4 first:pt-0 last:pb-0">
+              {row.type === "Task" ? (
+                <TaskRow
+                  title={row.title}
+                  details={row.details}
+                  date={row.date}
+                  onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+                />
+              ) : (
+                <RepeatingTaskRow
+                  title={row.title}
+                  details={row.details}
+                  date={row.date}
+                  onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: row.repeatingTaskId })}
+                />
+              )}
+            </li>
+          )}
+        </For>
+      </ul>
+    </main>
+  );
+}
+
 function scheduleRows(data: UserData): ScheduleRow[] {
   const taskRows: ScheduleRow[] = Object.entries(data.tasks)
     .flatMap(([taskId, task]) =>
@@ -287,6 +278,88 @@ function scheduleRows(data: UserData): ScheduleRow[] {
     );
   return [...taskRows, ...repeatingTaskRows].sort((left, right) =>
     left.date.localeCompare(right.date) || left.title.localeCompare(right.title)
+  );
+}
+
+type OpenRow =
+  | { type: "Task"; taskId: string; title: string; details: string; date: TaskDate; }
+  | { type: "RepeatingTask"; repeatingTaskId: string; title: string; details: string; date: TaskDate; };
+
+function OpenList(props: {
+  userData: UserData;
+  setSelected: (selection: Selection) => void;
+}) {
+  return (
+    <main class="px-4 mx-auto w-full max-w-lg">
+      <ul class="divide-y divide-border px-4">
+        <For each={openRows(props.userData)}>
+          {(row) => (
+            <li class="py-4 first:pt-0 last:pb-0">
+              {row.type === "Task" ? (
+                <TaskRow
+                  title={row.title}
+                  details={row.details}
+                  date={row.date}
+                  onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+                />
+              ) : (
+                <RepeatingTaskRow
+                  title={row.title}
+                  details={row.details}
+                  date={row.date}
+                  onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: row.repeatingTaskId })}
+                />
+              )}
+            </li>
+          )}
+        </For>
+      </ul>
+    </main>
+  );
+}
+
+function openRows(data: UserData): OpenRow[] {
+  const taskRows: OpenRow[] = Object.entries(data.tasks)
+    .flatMap(([taskId, task]) =>
+      task.completedAt === null
+        ? [{ type: "Task", taskId, title: task.title, details: task.details, date: task.date }]
+        : []
+    );
+  const repeatingTaskRows: OpenRow[] = Object.entries(data.repeatingTasks)
+    .map(([repeatingTaskId, repeatingTask]) => ({
+      type: "RepeatingTask",
+      repeatingTaskId,
+      title: repeatingTask.title,
+      details: repeatingTask.details,
+      date: repeatingTask.schedule.nextDate,
+    }));
+  return [...taskRows, ...repeatingTaskRows].sort((left, right) =>
+    left.date.localeCompare(right.date) || left.title.localeCompare(right.title)
+  );
+}
+
+type CompletedRow = { taskId: string; title: string; completedAt: Timestamp; };
+
+function CompletedList(props: {
+  userData: UserData;
+  setSelected: (selection: Selection) => void;
+}) {
+  return (
+    <main class="px-4 mx-auto w-full max-w-lg">
+      <ul class="divide-y divide-border px-4">
+        <For each={completedRows(props.userData)}>
+          {(row) => (
+            <li class="py-4 first:pt-0 last:pb-0">
+              <CompletedTaskRow
+                title={row.title}
+                completedAt={row.completedAt}
+                onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+              />
+            </li>
+          )}
+        </For>
+      </ul>
+    </main>
   );
 }
 

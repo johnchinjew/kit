@@ -4,7 +4,8 @@ Just a to-do list.
 
 ## Features
 
-- Schedule view: all non-completed tasks and 1 year of occurrences for all repeating tasks, ordered by date.
+- Schedule view: all incomplete tasks and 1 year of occurrences for all repeating tasks, ordered by date.
+- Open view: all incomplete tasks, ordered by date. Each repeating task appears only once on its next occurrence date.
 - Completed view: all completed tasks, ordered by completion date. Tasks are deleted 1 year after completion.
 - Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task is fully
   independent of that repeating task. Every task must have a date (up to 1 year away).

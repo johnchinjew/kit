@@ -308,7 +308,7 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   expect(subscribeUserData).toHaveBeenCalledTimes(1);
 });
 
-it("sorts tasks and repeating rows together and excludes completed tasks", () => {
+it.each(["Schedule", "Open"])("sorts incomplete tasks and repeating occurrences together in %s", (mode) => {
   const completedAt = Timestamp.fromDate(new Date("2026-11-03T12:00:00Z"));
   const data: UserData = {
     tasks: {
@@ -317,10 +317,10 @@ it("sorts tasks and repeating rows together and excludes completed tasks", () =>
       earlier: { title: "Earlier", details: "", date: decodeTaskDate("2026-11-04"), completedAt: null },
     },
     repeatingTasks: {
-      yearly: {
-        title: "Yearly", details: "",
+      weekly: {
+        title: "Weekly", details: "",
         schedule: {
-          nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Years", anchorDate: decodeTaskDate("2026-11-05"),
+          nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Weeks", anchorDate: decodeTaskDate("2026-11-05"),
         },
         scheduleEditedAt: Timestamp.now(),
       },
@@ -332,10 +332,21 @@ it("sorts tasks and repeating rows together and excludes completed tasks", () =>
   });
   dispose = render(() => <App />, document.body);
 
-  expect([...document.querySelectorAll("li button > span:first-child")].map((title) => title.textContent)).toEqual(["Earlier", "Yearly", "Later"]);
-  expect([...document.querySelectorAll("li time")].map((time) => time.getAttribute("datetime"))).toEqual([
+  const select = document.querySelector("select")!;
+  select.value = mode;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  const rows = [...document.querySelectorAll("li")];
+  expect(rows.slice(0, 3).map((row) => row.querySelector("button > span:first-child")!.textContent)).toEqual(["Earlier", "Weekly", "Later"]);
+  expect(rows.slice(0, 3).map((row) => row.querySelector("time")!.getAttribute("datetime"))).toEqual([
     "2026-11-04", "2026-11-05", "2026-11-06",
   ]);
-  expect(document.querySelectorAll("li")[1]!.textContent).toContain("↻");
+  expect(rows[1]!.textContent).toContain("↻");
 
+  if (mode === "Schedule") {
+    expect(rows[3]?.querySelector("button > span:first-child")?.textContent).toBe("Weekly");
+    expect(rows[3]?.querySelector("time")?.getAttribute("datetime")).toBe("2026-11-12");
+  } else {
+    expect(rows).toHaveLength(3);
+  }
 });
