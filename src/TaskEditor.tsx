@@ -124,23 +124,19 @@ export default function TaskEditor(props: {
 
   return (
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-      <header class="flex items-center justify-between">
-        <div>
-          <TextButton onClick={onClickBack}>
-            ←
+      <header class="flex justify-between">
+        <TextButton onClick={onClickBack}>
+          ←
+        </TextButton>
+        <Show when={props.task.completedAt === null} fallback={
+          <TextButton onClick={onClickReopen}>
+            Reopen
           </TextButton>
-        </div>
-        <div>
-          <Show when={props.task.completedAt === null} fallback={
-            <TextButton onClick={onClickReopen}>
-              Reopen
-            </TextButton>
-          }>
-            <TextButton onClick={onClickComplete}>
-              Complete
-            </TextButton>
-          </Show>
-        </div>
+        }>
+          <TextButton onClick={onClickComplete}>
+            Complete
+          </TextButton>
+        </Show>
       </header>
       <label class="grid gap-1 text-sm">
         <span class="px-4 text-foreground-muted">Title</span>

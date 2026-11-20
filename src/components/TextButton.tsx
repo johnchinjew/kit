@@ -9,7 +9,7 @@ export default function TextButton(props: TextButtonProps) {
   return (
     <button
       type="button"
-      class="w-full px-4 py-2.5 font-semibold rounded-md cursor-pointer bg-background text-foreground"
+      class="block px-4 py-2.5 font-semibold rounded-md cursor-pointer bg-background text-foreground"
       onClick={props.onClick}
     >
       {props.children}
