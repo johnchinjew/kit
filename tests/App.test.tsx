@@ -187,7 +187,6 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("Deleted task");
   receive({ tasks: { remaining }, repeatingTasks: {} });
   expect(document.querySelector('[name="title"]')).toBeNull();
-  expect(document.body.textContent).not.toContain("Loading task");
   expect(document.querySelector("select")!.value).toBe(completed ? "Completed" : "Schedule");
   expect(document.querySelector("li button > span:first-child")!.textContent).toBe("Remaining task");
   document.querySelector<HTMLButtonElement>("li button")!.click();
@@ -207,7 +206,7 @@ it("keeps a newly created task selected while waiting for its first snapshot", (
   [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
   const taskId = vi.mocked(createTask).mock.calls[0]![1];
   receive({ tasks: {}, repeatingTasks: {} });
-  expect(document.body.textContent).toContain("Loading task");
+  expect(document.querySelector('[name="title"]')).toBeNull();
   receive({ tasks: { [taskId]: {
     title: "New task", details: "", date: decodeTaskDate("2026-10-07"), completedAt: null,
   } }, repeatingTasks: {} });
@@ -255,7 +254,7 @@ it("keeps a newly created repeating task selected while waiting for its first sn
   [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Repeating Task")!.click();
   const repeatingTaskId = vi.mocked(createRepeatingTask).mock.calls[0]![1];
   receive({ tasks: {}, repeatingTasks: {} });
-  expect(document.body.textContent).toContain("Loading repeating task");
+  expect(document.querySelector('[name="title"]')).toBeNull();
   receive({ tasks: {}, repeatingTasks: { [repeatingTaskId]: {
     title: "", details: "",
     schedule: {

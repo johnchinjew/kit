@@ -52,14 +52,17 @@ function AppLoading() {
 // SIGNED IN
 
 type ListMode = "Schedule" | "Open" | "Completed";
-type Selection = { type: "Task"; taskId: string; } | { type: "RepeatingTask"; repeatingTaskId: string; };
+type View =
+  | { type: "List"; }
+  | { type: "TaskEditor"; taskId: string; }
+  | { type: "RepeatingTaskEditor"; repeatingTaskId: string; };
 
 function AppSignedIn(props: {
   session: SignedIn;
   signOut: () => void;
   showNotice: (message: string) => void;
 }) {
-  const [selected, setSelected] = createSignal<Selection>();
+  const [view, setView] = createSignal<View>({ type: "List" });
   const [listMode, setListMode] = createSignal<ListMode>("Schedule");
   const [userData, setUserData] = createSignal<UserData>(emptyUserData());
 
@@ -70,9 +73,11 @@ function AppSignedIn(props: {
 
     const unsubscribe = subscribeUserData(props.session.user.userId, (data) => untrack(() => {
       // Close the editor if the item was deleted.
-      const current = selected();
-      if (current?.type === "Task" && userData().tasks[current.taskId] && !data.tasks[current.taskId]) setSelected(undefined);
-      if (current?.type === "RepeatingTask" && userData().repeatingTasks[current.repeatingTaskId] && !data.repeatingTasks[current.repeatingTaskId]) setSelected(undefined);
+      const current = view();
+      if (current.type === "TaskEditor" && userData().tasks[current.taskId] && !data.tasks[current.taskId])
+        setView({ type: "List" });
+      if (current.type === "RepeatingTaskEditor" && userData().repeatingTasks[current.repeatingTaskId] && !data.repeatingTasks[current.repeatingTaskId])
+        setView({ type: "List" });
 
       setUserData(data);
 
@@ -93,49 +98,74 @@ function AppSignedIn(props: {
     const taskId = crypto.randomUUID();
     void createTask(props.session.user.userId, taskId).catch(() => {
       props.showNotice("Could not create task. Try again later.");
-      const current = selected();
-      if (current?.type === "Task" && current.taskId === taskId) setSelected(undefined);
+      const current = view();
+      if (current.type === "TaskEditor" && current.taskId === taskId)
+        setView({ type: "List" });
     });
-    setSelected({ type: "Task", taskId });
+    setView({ type: "TaskEditor", taskId });
   }
 
   function addRepeatingTask() {
     const repeatingTaskId = crypto.randomUUID();
     void createRepeatingTask(props.session.user.userId, repeatingTaskId).catch(() => {
       props.showNotice("Could not create repeating task. Try again later.");
-      const current = selected();
-      if (current?.type === "RepeatingTask" && current.repeatingTaskId === repeatingTaskId) setSelected(undefined);
+      const current = view();
+      if (current.type === "RepeatingTaskEditor" && current.repeatingTaskId === repeatingTaskId)
+        setView({ type: "List" });
     });
-    setSelected({ type: "RepeatingTask", repeatingTaskId });
+    setView({ type: "RepeatingTaskEditor", repeatingTaskId });
   }
 
   return (
-    <Show when={selected()} fallback={
-      <List
-        userData={userData()}
-        listMode={listMode()}
-        photoUrl={props.session.user.photoUrl}
-        signOut={props.signOut}
-        setListMode={setListMode}
-        setSelected={setSelected}
-        addTask={addTask}
-        addRepeatingTask={addRepeatingTask}
-      />
-    }>
-      {(selection) => (
-        <Editor
-          session={props.session}
-          userData={userData()}
-          selection={selection()}
-          showNotice={props.showNotice}
-          onBack={() => setSelected(undefined)}
-        />
-      )}
+    <Show when={view()} keyed>
+      {(current) => {
+        switch (current.type) {
+          case "List":
+            return (
+              <List
+                userData={userData()}
+                listMode={listMode()}
+                photoUrl={props.session.user.photoUrl}
+                signOut={props.signOut}
+                setListMode={setListMode}
+                setView={setView}
+                addTask={addTask}
+                addRepeatingTask={addRepeatingTask}
+              />
+            );
+          case "TaskEditor":
+            return (
+              <Show when={userData().tasks[current.taskId]} fallback={<p>Loading...</p>}>
+                {(task) => (
+                  <TaskEditor
+                    taskId={current.taskId}
+                    task={task()}
+                    session={props.session}
+                    showNotice={props.showNotice}
+                    onBack={() => setView({ type: "List" })}
+                  />
+                )}
+              </Show>
+            );
+          case "RepeatingTaskEditor":
+            return (
+              <Show when={userData().repeatingTasks[current.repeatingTaskId]} fallback={<p>Loading...</p>}>
+                {(repeatingTask) => (
+                  <RepeatingTaskEditor
+                    repeatingTaskId={current.repeatingTaskId}
+                    repeatingTask={repeatingTask()}
+                    session={props.session}
+                    showNotice={props.showNotice}
+                    onBack={() => setView({ type: "List" })}
+                  />
+                )}
+              </Show>
+            );
+        }
+      }}
     </Show>
   );
 }
-
-// SIGNED IN LIST
 
 function List(props: {
   userData: UserData;
@@ -143,7 +173,7 @@ function List(props: {
   photoUrl: string | null;
   signOut: () => void;
   setListMode: (mode: ListMode) => void;
-  setSelected: (selection: Selection) => void;
+  setView: (view: View) => void;
   addTask: () => void;
   addRepeatingTask: () => void;
 }) {
@@ -158,14 +188,14 @@ function List(props: {
       <Switch>
         <Match when={props.listMode === "Schedule"}>
           <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
-          <ScheduleList userData={props.userData} setSelected={props.setSelected} />
+          <ScheduleList userData={props.userData} setView={props.setView} />
         </Match>
         <Match when={props.listMode === "Open"}>
           <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
-          <OpenList userData={props.userData} setSelected={props.setSelected} />
+          <OpenList userData={props.userData} setView={props.setView} />
         </Match>
         <Match when={props.listMode === "Completed"}>
-          <CompletedList userData={props.userData} setSelected={props.setSelected} />
+          <CompletedList userData={props.userData} setView={props.setView} />
         </Match>
       </Switch>
     </div>
@@ -233,7 +263,7 @@ type ScheduleRow =
 
 function ScheduleList(props: {
   userData: UserData;
-  setSelected: (selection: Selection) => void;
+  setView: (view: View) => void;
 }) {
   return (
     <main class="px-4 mx-auto w-full max-w-lg">
@@ -246,14 +276,14 @@ function ScheduleList(props: {
                   title={row.title}
                   details={row.details}
                   date={row.date}
-                  onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+                  onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
                 />
               ) : (
                 <RepeatingTaskRow
                   title={row.title}
                   details={row.details}
                   date={row.date}
-                  onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: row.repeatingTaskId })}
+                  onClick={() => props.setView({ type: "RepeatingTaskEditor", repeatingTaskId: row.repeatingTaskId })}
                 />
               )}
             </li>
@@ -287,7 +317,7 @@ type OpenRow =
 
 function OpenList(props: {
   userData: UserData;
-  setSelected: (selection: Selection) => void;
+  setView: (view: View) => void;
 }) {
   return (
     <main class="px-4 mx-auto w-full max-w-lg">
@@ -300,14 +330,14 @@ function OpenList(props: {
                   title={row.title}
                   details={row.details}
                   date={row.date}
-                  onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+                  onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
                 />
               ) : (
                 <RepeatingTaskRow
                   title={row.title}
                   details={row.details}
                   date={row.date}
-                  onClick={() => props.setSelected({ type: "RepeatingTask", repeatingTaskId: row.repeatingTaskId })}
+                  onClick={() => props.setView({ type: "RepeatingTaskEditor", repeatingTaskId: row.repeatingTaskId })}
                 />
               )}
             </li>
@@ -342,7 +372,7 @@ type CompletedRow = { taskId: string; title: string; completedAt: Timestamp; };
 
 function CompletedList(props: {
   userData: UserData;
-  setSelected: (selection: Selection) => void;
+  setView: (view: View) => void;
 }) {
   return (
     <main class="px-4 mx-auto w-full max-w-lg">
@@ -353,7 +383,7 @@ function CompletedList(props: {
               <CompletedTaskRow
                 title={row.title}
                 completedAt={row.completedAt}
-                onClick={() => props.setSelected({ type: "Task", taskId: row.taskId })}
+                onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
               />
             </li>
           )}
@@ -440,51 +470,6 @@ function CompletedTaskRow(props: {
         Completed {formatTaskDate(taskDateFromDate(completedDate()), taskDateToday())}
       </time>
     </button>
-  );
-}
-
-// SIGNED IN EDITOR
-
-function Editor(props: {
-  session: SignedIn;
-  userData: UserData;
-  selection: Selection;
-  showNotice: (message: string) => void;
-  onBack: () => void;
-}) {
-  return (
-    <Switch>
-      <Match when={props.selection.type === "Task" && props.selection}>
-        {(selection) => (
-          <Show when={props.userData.tasks[selection().taskId]} fallback={<p>Loading task</p>}>
-            {(task) => (
-              <TaskEditor
-                taskId={selection().taskId}
-                task={task()}
-                session={props.session}
-                showNotice={props.showNotice}
-                onBack={props.onBack}
-              />
-            )}
-          </Show>
-        )}
-      </Match>
-      <Match when={props.selection.type === "RepeatingTask" && props.selection}>
-        {(selection) => (
-          <Show when={props.userData.repeatingTasks[selection().repeatingTaskId]} fallback={<p>Loading repeating task</p>}>
-            {(repeatingTask) => (
-              <RepeatingTaskEditor
-                repeatingTaskId={selection().repeatingTaskId}
-                repeatingTask={repeatingTask()}
-                session={props.session}
-                showNotice={props.showNotice}
-                onBack={props.onBack}
-              />
-            )}
-          </Show>
-        )}
-      </Match>
-    </Switch>
   );
 }
 
