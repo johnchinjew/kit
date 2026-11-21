@@ -361,7 +361,7 @@ function CompletedList(props: {
   setView: (view: View) => void;
 }) {
   return (
-    <main class="px-4 mx-auto w-full max-w-lg">
+    <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
       <ul class="divide-y divide-border px-4">
         <For each={completedRows(props.userData)}>
           {(row) => (
