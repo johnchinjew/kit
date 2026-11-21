@@ -9,7 +9,7 @@
     "check": "tsc --noEmit && npm test",
     "dev": "concurrently --kill-others \"npm run dev:build\" \"npm run dev:emulators\"",
     "dev:build": "vite build --watch --mode emulator",
-    "dev:emulators": "firebase emulators:start",
+    "dev:emulators": "firebase emulators:start --config firebase.emulator.json",
     "test": "firebase emulators:exec --config firebase.test.json --project demo-kit-tasks \"vitest run\""
   },
   "devDependencies": {

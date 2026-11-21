@@ -4,3 +4,4 @@ gha-creds-*.json
 .firebase/
 node_modules/
 dist/
+dist-emulator/

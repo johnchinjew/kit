@@ -4,6 +4,9 @@ import solidPlugin from "vite-plugin-solid";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig(({ mode }) => ({
+  build: {
+    outDir: mode === "emulator" ? "dist-emulator" : "dist",
+  },
   plugins: [
     solidPlugin(),
     tailwindcss(),
