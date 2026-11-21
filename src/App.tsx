@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import TaskCreator from "./TaskCreator";
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
 import Button from "./components/Button";
@@ -9,9 +10,7 @@ import { formatTaskDate, taskDateFromDate, taskDateOneYearFromToday, taskDateTod
 import { createNotice } from "./notice";
 import { createSession, type SignedIn } from "./session";
 import {
-  createRepeatingTask,
   createTasksFromRepeatingTasks,
-  createTask,
   emptyUserData,
   subscribeUserData,
   type UserData,
@@ -27,8 +26,10 @@ export default function App() {
         <Match when={session().status === "CheckingAuth"}><AppLoading /></Match>
         <Match when={session().status === "SigningIn"}><AppLoading /></Match>
         <Match when={session().status === "SigningOut"}><AppLoading /></Match>
-        <Match when={session().status === "SignedIn" && (session() as SignedIn)}>
-          {(current) => <AppSignedIn session={current()} signOut={signOut} showNotice={showNotice} />}
+        {/* Use keyed so AppSignedIn gets remounted whenever the session changes.
+            This ensures the previous user's draft is not accessible by the newly signed in user. */}
+        <Match when={session().status === "SignedIn" && (session() as SignedIn)} keyed>
+          {(current) => <AppSignedIn session={current} signOut={signOut} showNotice={showNotice} />}
         </Match>
         <Match when={session().status === "SignedOut"}>
           <AppSignedOut signIn={signIn} />
@@ -54,6 +55,7 @@ function AppLoading() {
 type ListMode = "Schedule" | "Open" | "Completed";
 type View =
   | { type: "List"; }
+  | { type: "TaskCreator"; }
   | { type: "TaskEditor"; taskId: string; }
   | { type: "RepeatingTaskEditor"; repeatingTaskId: string; };
 
@@ -94,28 +96,6 @@ function AppSignedIn(props: {
     onCleanup(unsubscribe);
   });
 
-  function addTask() {
-    const taskId = crypto.randomUUID();
-    void createTask(props.session.user.userId, taskId).catch(() => {
-      props.showNotice("Could not create task. Try again later.");
-      const current = view();
-      if (current.type === "TaskEditor" && current.taskId === taskId)
-        setView({ type: "List" });
-    });
-    setView({ type: "TaskEditor", taskId });
-  }
-
-  function addRepeatingTask() {
-    const repeatingTaskId = crypto.randomUUID();
-    void createRepeatingTask(props.session.user.userId, repeatingTaskId).catch(() => {
-      props.showNotice("Could not create repeating task. Try again later.");
-      const current = view();
-      if (current.type === "RepeatingTaskEditor" && current.repeatingTaskId === repeatingTaskId)
-        setView({ type: "List" });
-    });
-    setView({ type: "RepeatingTaskEditor", repeatingTaskId });
-  }
-
   return (
     <Show when={view()} keyed>
       {(current) => {
@@ -129,8 +109,15 @@ function AppSignedIn(props: {
                 signOut={props.signOut}
                 setListMode={setListMode}
                 setView={setView}
-                addTask={addTask}
-                addRepeatingTask={addRepeatingTask}
+                openTaskCreator={() => setView({ type: "TaskCreator" })}
+              />
+            );
+          case "TaskCreator":
+            return (
+              <TaskCreator
+                session={props.session}
+                showNotice={props.showNotice}
+                onBack={() => setView({ type: "List" })}
               />
             );
           case "TaskEditor":
@@ -174,8 +161,7 @@ function List(props: {
   signOut: () => void;
   setListMode: (mode: ListMode) => void;
   setView: (view: View) => void;
-  addTask: () => void;
-  addRepeatingTask: () => void;
+  openTaskCreator: () => void;
 }) {
   return (
     <div class="min-h-dvh flex flex-col">
@@ -187,11 +173,11 @@ function List(props: {
       />
       <Switch>
         <Match when={props.listMode === "Schedule"}>
-          <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
+          <ActionBar openTaskCreator={props.openTaskCreator} />
           <ScheduleList userData={props.userData} setView={props.setView} />
         </Match>
         <Match when={props.listMode === "Open"}>
-          <ActionBar addTask={props.addTask} addRepeatingTask={props.addRepeatingTask} />
+          <ActionBar openTaskCreator={props.openTaskCreator} />
           <OpenList userData={props.userData} setView={props.setView} />
         </Match>
         <Match when={props.listMode === "Completed"}>
@@ -246,13 +232,13 @@ function SignOutButton(props: { photoUrl: string | null; signOut: () => void; })
 }
 
 function ActionBar(props: {
-  addTask: () => void;
-  addRepeatingTask: () => void;
+  openTaskCreator: () => void;
 }) {
   return (
-    <div class="order-last sticky bottom-0 mt-auto mx-auto w-full max-w-lg flex gap-x-2 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-linear-to-b from-transparent to-background to-50%">
-      <Button onClick={props.addTask}>＋ Task</Button>
-      <Button onClick={props.addRepeatingTask}>＋ Repeating Task</Button>
+    <div class="order-last sticky bottom-0 mt-auto mx-auto w-full max-w-lg px-4 pt-4">
+      <div class="bg-background pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <Button onClick={props.openTaskCreator}>＋ Task</Button>
+      </div>
     </div>
   );
 }

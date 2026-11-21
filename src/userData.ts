@@ -28,16 +28,22 @@ export function emptyUserData(): UserData {
 
 // WRITE TASKS
 
-export async function createTask(userId: string, taskId: string): Promise<void> {
+export async function createTask(
+  userId: string,
+  taskId: string,
+  title: string,
+  details: string,
+  date: TaskDate,
+): Promise<void> {
   const editedAt = Timestamp.now();
   await setDoc(doc(getFirestore(), "users", userId), {
     operation: { type: "CreateTask", taskId },
     tasks: {
       [taskId]: {
-        title: "",
-        details: "",
+        title,
+        details,
         completed: false,
-        date: taskDateToday(),
+        date,
         titleEditedAt: editedAt,
         detailsEditedAt: editedAt,
         completedEditedAt: editedAt,
@@ -57,36 +63,12 @@ export async function createTasksFromRepeatingTasks(userId: string, data: UserDa
     for (const date of occurrenceDates(repeatingTask.schedule, today)) {
       const taskId = crypto.randomUUID();
       const current = { ...repeatingTask, schedule: { ...repeatingTask.schedule, nextDate: date } };
-      writes.push(createTaskFromRepeatingTask(userId, taskId, current));
+      writes.push(createTask(userId, taskId, repeatingTask.title, repeatingTask.details, date));
       writes.push(advanceRepeatingTask(userId, repeatingTaskId, current, taskId));
     }
   }
   // Await everything here so the caller can catch errors when the server responds, i.e. when online.
   await Promise.all(writes);
-}
-
-async function createTaskFromRepeatingTask(
-  userId: string,
-  taskId: string,
-  repeatingTask: RepeatingTask,
-): Promise<void> {
-  const date = repeatingTask.schedule.nextDate;
-  const editedAt = Timestamp.now();
-  await setDoc(doc(getFirestore(), "users", userId), {
-    operation: { type: "CreateTask", taskId },
-    tasks: {
-      [taskId]: {
-        title: repeatingTask.title,
-        details: repeatingTask.details,
-        completed: false,
-        date,
-        titleEditedAt: editedAt,
-        detailsEditedAt: editedAt,
-        completedEditedAt: editedAt,
-        dateEditedAt: editedAt,
-      },
-    },
-  }, { merge: true });
 }
 
 async function advanceRepeatingTask(
@@ -156,21 +138,21 @@ export async function deleteTask(userId: string, taskId: string): Promise<void> 
 
 // WRITE REPEATING TASKS
 
-export async function createRepeatingTask(userId: string, repeatingTaskId: string): Promise<void> {
+export async function createRepeatingTask(
+  userId: string,
+  repeatingTaskId: string,
+  title: string,
+  details: string,
+  schedule: Schedule,
+): Promise<void> {
   const editedAt = Timestamp.now();
-  const nextDate = taskDateToday();
   await setDoc(doc(getFirestore(), "users", userId), {
     operation: { type: "CreateRepeatingTask", repeatingTaskId },
     repeatingTasks: {
       [repeatingTaskId]: {
-        title: "",
-        details: "",
-        schedule: {
-          nextDate,
-          interval: 1,
-          intervalUnit: "Days",
-          anchorDate: nextDate
-        },
+        title,
+        details,
+        schedule,
         titleEditedAt: editedAt,
         detailsEditedAt: editedAt,
         scheduleEditedAt: editedAt,

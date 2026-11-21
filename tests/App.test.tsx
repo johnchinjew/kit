@@ -194,24 +194,153 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   expect(subscribeUserData).toHaveBeenCalledTimes(1);
 });
 
-it("keeps a newly created task selected while waiting for its first snapshot", () => {
-  vi.mocked(createTask).mockImplementation(() => new Promise(() => {}));
-  let receive: (data: UserData) => void = () => {};
+it("discards an open task draft when the signed-in user changes", () => {
+  const [session, setSession] = createSignal<Session>({ status: "SignedIn", user: { userId: "alice", photoUrl: null } });
+  vi.mocked(createSession).mockReturnValueOnce({ session, signIn: vi.fn(), signOut: vi.fn() });
+  const unsubscribeAlice = vi.fn();
+  vi.mocked(subscribeUserData).mockReturnValueOnce(unsubscribeAlice).mockReturnValueOnce(vi.fn());
+  dispose = render(() => <App />, document.body);
+  const add = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+
+  add();
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  title.value = "Alice's draft";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+
+  setSession({ status: "SignedIn", user: { userId: "bob", photoUrl: null } });
+
+  expect(document.querySelector('[name="title"]')).toBeNull();
+  expect(unsubscribeAlice).toHaveBeenCalledOnce();
+  expect(subscribeUserData).toHaveBeenLastCalledWith("bob", expect.any(Function), expect.any(Function));
+  expect(createTask).not.toHaveBeenCalled();
+  expect(createRepeatingTask).not.toHaveBeenCalled();
+
+  add();
+  expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("");
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  expect(createTask).toHaveBeenCalledExactlyOnceWith("bob", expect.any(String), "", "", "2026-11-04");
+});
+
+it("discards the draft and returns to the list when Cancel is pressed", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  const add = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+
+  add();
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  title.value = "Discard this task";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "Cancel")!.click();
+
+  expect(document.querySelector('[name="title"]')).toBeNull();
+  expect(createTask).not.toHaveBeenCalled();
+  expect(createRepeatingTask).not.toHaveBeenCalled();
+  add();
+  expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("");
+});
+
+it("creates an untitled task for today when Back is pressed on a fresh draft", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  expect(createTask).not.toHaveBeenCalled();
+
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  expect(createTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", "2026-11-04");
+  expect(createRepeatingTask).not.toHaveBeenCalled();
+});
+
+it("accepts a date one year from today and rejects the following day", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+
+  const date = document.querySelector<HTMLInputElement>('[name="date"]')!;
+  const back = [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!;
+  date.value = "2027-11-05";
+  date.dispatchEvent(new Event("input", { bubbles: true }));
+  back.click();
+
+  expect(createTask).not.toHaveBeenCalled();
+  expect(document.querySelector('[name="date"]')).toBe(date);
+
+  date.value = "2027-11-04";
+  date.dispatchEvent(new Event("input", { bubbles: true }));
+  back.click();
+
+  expect(createTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", "2027-11-04");
+  expect(document.querySelector('[name="date"]')).toBeNull();
+});
+
+it("clamps a multi-day repeat interval to one when switched to Years", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+
+  const interval = document.querySelector<HTMLInputElement>('[name="interval"]')!;
+  interval.value = "3";
+  interval.dispatchEvent(new Event("input", { bubbles: true }));
+  const unit = document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!;
+  unit.value = "Years";
+  unit.dispatchEvent(new Event("change", { bubbles: true }));
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+
+  expect(createRepeatingTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", {
+    nextDate: "2026-11-04", anchorDate: "2026-11-04", interval: 1, intervalUnit: "Years",
+  });
+});
+
+it.each([false, true])("creates the finished draft only on Back, with repeat=%s", (repeat) => {
+  let receive!: (data: UserData) => void;
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
-    receive({ tasks: {}, repeatingTasks: {} });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
-  const taskId = vi.mocked(createTask).mock.calls[0]![1];
+  const add = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  const back = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+
+  add();
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  title.value = " Laundry ";
+  title.dispatchEvent(new Event("input", { bubbles: true }));
+  const details = document.querySelector<HTMLTextAreaElement>('[name="details"]')!;
+  details.value = " Wash the sheets ";
+  details.dispatchEvent(new Event("input", { bubbles: true }));
+  const date = "2026-11-12";
+  const dateInput = document.querySelector<HTMLInputElement>('[name="date"]')!;
+  dateInput.value = date;
+  dateInput.dispatchEvent(new Event("input", { bubbles: true }));
+  const toggle = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  toggle.click();
+  const interval = document.querySelector<HTMLInputElement>('[name="interval"]')!;
+  interval.value = "0";
+  interval.dispatchEvent(new Event("input", { bubbles: true }));
+  back();
+  expect(document.querySelector('[name="title"]')).toBe(title);
+  if (repeat) {
+    interval.value = "2";
+    interval.dispatchEvent(new Event("input", { bubbles: true }));
+  } else {
+    toggle.click();
+  }
   receive({ tasks: {}, repeatingTasks: {} });
+  expect(title.value).toBe(" Laundry ");
+  expect(createTask).not.toHaveBeenCalled();
+  expect(createRepeatingTask).not.toHaveBeenCalled();
+
+  back();
+  if (repeat) {
+    expect(createRepeatingTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "Laundry", "Wash the sheets", {
+      nextDate: date, anchorDate: date, interval: 2, intervalUnit: "Days",
+    });
+    expect(createTask).not.toHaveBeenCalled();
+  } else {
+    expect(createTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "Laundry", "Wash the sheets", date);
+    expect(createRepeatingTask).not.toHaveBeenCalled();
+  }
   expect(document.querySelector('[name="title"]')).toBeNull();
-  receive({ tasks: { [taskId]: {
-    title: "New task", details: "", date: decodeTaskDate("2026-10-07"), completedAt: null,
-  } }, repeatingTasks: {} });
-  expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("New task");
-  expect(subscribeUserData).toHaveBeenCalledTimes(1);
 });
 
 it("projects a repeating task separately from its generated tasks", () => {
@@ -240,30 +369,6 @@ it("projects a repeating task separately from its generated tasks", () => {
   expect(document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')).not.toBeNull();
   expect([...document.querySelectorAll("button")].map((button) => button.textContent)).not.toContain("Complete");
 
-});
-
-it("keeps a newly created repeating task selected while waiting for its first snapshot", () => {
-  vi.mocked(createRepeatingTask).mockImplementation(() => new Promise(() => {}));
-  let receive: (data: UserData) => void = () => {};
-  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
-    receive = onData;
-    receive({ tasks: {}, repeatingTasks: {} });
-    return vi.fn();
-  });
-  dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Repeating Task")!.click();
-  const repeatingTaskId = vi.mocked(createRepeatingTask).mock.calls[0]![1];
-  receive({ tasks: {}, repeatingTasks: {} });
-  expect(document.querySelector('[name="title"]')).toBeNull();
-  receive({ tasks: {}, repeatingTasks: { [repeatingTaskId]: {
-    title: "", details: "",
-    schedule: {
-      nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-11-05"),
-    },
-    scheduleEditedAt: Timestamp.now(),
-  } } });
-  expect(document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!.value).toBe("Days");
-  expect(document.querySelector("button")!.textContent).toBe("←");
 });
 
 it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft during live updates", (kind) => {

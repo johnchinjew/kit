@@ -103,13 +103,12 @@ it("creates tasks for occurrences after the schedule changes or the repeating ta
 });
 
 it("creates a repeating task without creating a task", async () => {
-  await createRepeatingTask("alice", "new-repeating-task");
+  await createRepeatingTask("alice", "new-repeating-task", repeatingTask.title, repeatingTask.details, schedule);
 
   const stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(stored.tasks).toEqual({});
   expect(stored.repeatingTasks["new-repeating-task"]).toMatchObject({
-    title: "", details: "",
-    schedule: { nextDate: taskDateToday(), interval: 1, intervalUnit: "Days", anchorDate: taskDateToday() },
+    title: "Rent", details: "Pay landlord", schedule,
     scheduleEditedAt: expect.any(Timestamp),
   });
 });

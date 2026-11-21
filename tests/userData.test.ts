@@ -50,15 +50,17 @@ describe("User data: task creation", () => {
     vi.mocked(setDoc).mockResolvedValue(undefined);
   });
 
-  it("creates an empty task with the specified ID in the user's document", async () => {
-    await expect(createTask("alice", "first")).resolves.toBeUndefined();
+  const task = { title: "Groceries", details: "Buy milk", date: decodeTaskDate("2026-11-12") };
+
+  it("creates a task with the specified ID in the user's document", async () => {
+    await expect(createTask("alice", "first", task.title, task.details, task.date)).resolves.toBeUndefined();
 
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "CreateTask", taskId: "first" },
       tasks: {
         first: {
-          title: "", details: "", completed: false, date: taskDateToday(),
+          ...task, completed: false,
           titleEditedAt: expect.any(Timestamp),
           detailsEditedAt: expect.any(Timestamp),
           dateEditedAt: expect.any(Timestamp),
@@ -72,7 +74,7 @@ describe("User data: task creation", () => {
     const now = Date.now();
     const clock = vi.spyOn(Date, "now").mockReturnValue(now);
     try {
-      await createTask("alice", "first");
+      await createTask("alice", "first", task.title, task.details, task.date);
       const created = vi.mocked(setDoc).mock.calls[0]![1];
       expect(created).toMatchObject({
         tasks: {
@@ -103,8 +105,8 @@ describe("User data: task creation", () => {
     const error = new Error("Save failed");
     vi.mocked(setDoc).mockRejectedValueOnce(error);
 
-    await expect(createTask("alice", "first")).rejects.toBe(error);
-    await expect(createTask("alice", "second")).resolves.toBeUndefined();
+    await expect(createTask("alice", "first", task.title, task.details, task.date)).rejects.toBe(error);
+    await expect(createTask("alice", "second", task.title, task.details, task.date)).resolves.toBeUndefined();
     expect(setDoc).toHaveBeenCalledTimes(2);
   });
 
@@ -112,7 +114,7 @@ describe("User data: task creation", () => {
     const error = new Error("Invalid write");
     vi.mocked(setDoc).mockImplementationOnce(() => { throw error; });
 
-    await expect(createTask("alice", "first")).rejects.toBe(error);
+    await expect(createTask("alice", "first", task.title, task.details, task.date)).rejects.toBe(error);
   });
 });
 
@@ -150,12 +152,14 @@ describe("User data: repeating task operations", () => {
   });
 
   it("creates a repeating task as its own resource", async () => {
-    await createRepeatingTask("alice", "repeating.task.with.dots");
+    const date = decodeTaskDate("2026-11-12");
+    const schedule = { nextDate: date, anchorDate: date, interval: 2, intervalUnit: "Weeks" as const };
+    await createRepeatingTask("alice", "repeating.task.with.dots", "Laundry", "Sheets", schedule);
     expect(setDoc).toHaveBeenCalledExactlyOnceWith(userDocument, {
       operation: { type: "CreateRepeatingTask", repeatingTaskId: "repeating.task.with.dots" },
       repeatingTasks: {
         "repeating.task.with.dots": {
-          title: "", details: "", schedule: { nextDate: taskDateToday(), interval: 1, intervalUnit: "Days", anchorDate: taskDateToday() },
+          title: "Laundry", details: "Sheets", schedule,
           titleEditedAt: expect.any(Timestamp),
           detailsEditedAt: expect.any(Timestamp),
           scheduleEditedAt: expect.any(Timestamp),

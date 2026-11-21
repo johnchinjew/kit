@@ -60,7 +60,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     connectFirestoreEmulator(firestore, "127.0.0.1", 8081, { mockUserToken: { sub: "offline-user" } });
     await disableNetwork(firestore);
     const taskId = crypto.randomUUID();
-    void createTask("offline-user", taskId).catch(() => {});
+    void createTask("offline-user", taskId, "", "", taskDateToday()).catch(() => {});
     const userDocument = doc(firestore, "users", "offline-user");
     const created = await getDocFromCache(userDocument);
     expect(created.data()).toEqual({
@@ -104,7 +104,7 @@ it("retains offline task creation, title, details, and date editing, completion,
     });
 
     const deletedTaskId = "task.with.dots";
-    void createTask("offline-user", deletedTaskId).catch(() => {});
+    void createTask("offline-user", deletedTaskId, "", "", taskDateToday()).catch(() => {});
     void deleteTask("offline-user", deletedTaskId).catch(() => {});
     const deletedData = (await getDocFromCache(restartedDocument)).data();
     expect(deletedData).toEqual({
