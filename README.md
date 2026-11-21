@@ -44,6 +44,11 @@ Client -> Cloudflare -> Firebase Hosting
   unavoidable risks: queued writes may be rejected, old clients may stop working correctly, old clients may reintroduce
   legacy data that conflicts with the new model, etc.
 
+## Development
+
+When changing domain, logo, privacy policy URL, or other branding details, remember to update
+[Google OAuth branding](https://console.cloud.google.com/auth/branding?project=kit-tasks) accordingly.
+
 ## Known Issues
 
 - Date labels can remain stale when the app stays open across midnight.
