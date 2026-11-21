@@ -43,7 +43,7 @@ it.each([true, false])("deletes a repeating task only when confirmation is accep
 
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
 
-  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete this repeating task?");
+  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete repeating task?");
   if (confirmed) {
     expect(deleteRepeatingTask).toHaveBeenCalledExactlyOnceWith("alice", "rent");
     expect(onBack).toHaveBeenCalledOnce();

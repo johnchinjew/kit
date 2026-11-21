@@ -258,7 +258,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
   date.value = "";
   date.dispatchEvent(new Event("input", { bubbles: true }));
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
-  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete this task?");
+  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete task?");
   expect(deleteTask).toHaveBeenCalledExactlyOnceWith("alice", "first");
   expect(setTaskTitle).not.toHaveBeenCalled();
   expect(setTaskDetails).not.toHaveBeenCalled();
@@ -289,7 +289,7 @@ it("does not delete a task when deletion is canceled", () => {
 
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
 
-  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete this task?");
+  expect(confirm).toHaveBeenCalledExactlyOnceWith("Delete task?");
   expect(deleteTask).not.toHaveBeenCalled();
   expect(onBack).not.toHaveBeenCalled();
 });
