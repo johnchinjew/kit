@@ -1,3 +1,8 @@
+import Field from "./components/Field";
+import Fieldset from "./components/Fieldset";
+import Input from "./components/Input";
+import Select from "./components/Select";
+import TextArea from "./components/TextArea";
 import TextButton from "./components/TextButton";
 import { createSignal, type JSX } from "solid-js";
 import { maxInterval, type IntervalUnit, type RepeatingTask, type Schedule } from "./repeatingTask";
@@ -155,42 +160,33 @@ export default function RepeatingTaskEditor(props: {
           ←
         </TextButton>
       </div>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Title</span>
-        <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+      <Field label="Title">
+        <Input
           name="title"
           type="text"
           value={draft().title}
           onInput={onChangeTitle}
         />
-      </label>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Details</span>
-        <textarea
-          class="field-sizing-content min-h-[calc(4lh+1.25rem+2px)] w-full rounded-md border border-border bg-background px-4 py-2.5 text-base resize-y"
-          rows="4"
+      </Field>
+      <Field label="Details">
+        <TextArea
           name="details"
           value={draft().details}
           onInput={onChangeDetails}
         />
-      </label>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Repeats next on</span>
-        <input
-          class="w-auto justify-self-stretch rounded-md border border-border bg-background px-4 py-2.5 text-base"
+      </Field>
+      <Field label="Repeats next on">
+        <Input
           name="nextDate"
           type="date"
           max={taskDateOneYearFromToday()}
           value={draft().schedule.nextDate}
           onInput={onChangeNextDate}
         />
-      </label>
-      <fieldset>
-        <legend class="mb-1 px-4 text-sm text-foreground-muted">Repeats every</legend>
+      </Field>
+      <Fieldset legend="Repeats every">
         <div class="grid grid-cols-2 gap-2">
-          <input
-            class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+          <Input
             name="interval"
             type="number"
             min="1"
@@ -198,8 +194,7 @@ export default function RepeatingTaskEditor(props: {
             value={draft().schedule.interval}
             onInput={onChangeInterval}
           />
-          <select
-            class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+          <Select
             name="intervalUnit"
             value={draft().schedule.intervalUnit}
             onChange={onChangeIntervalUnit}
@@ -208,9 +203,9 @@ export default function RepeatingTaskEditor(props: {
             <option value="Weeks">Weeks</option>
             <option value="Months">Months</option>
             <option value="Years">Years</option>
-          </select>
+          </Select>
         </div>
-      </fieldset>
+      </Fieldset>
       <div class="justify-self-end">
         <TextButton onClick={onClickDelete}>
           Delete

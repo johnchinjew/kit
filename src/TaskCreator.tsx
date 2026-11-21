@@ -1,3 +1,8 @@
+import Field from "./components/Field";
+import Fieldset from "./components/Fieldset";
+import Input from "./components/Input";
+import Select from "./components/Select";
+import TextArea from "./components/TextArea";
 import { createSignal, Show } from "solid-js";
 import TextButton from "./components/TextButton";
 import { maxInterval, type IntervalUnit } from "./repeatingTask";
@@ -58,47 +63,38 @@ export default function TaskCreator(props: {
         <TextButton onClick={onClickBack}>←</TextButton>
         <TextButton onClick={props.onBack}>Cancel</TextButton>
       </div>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Title</span>
-        <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+      <Field label="Title">
+        <Input
           name="title"
           type="text"
           value={title()}
           onInput={(event) => setTitle(event.currentTarget.value)}
         />
-      </label>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Details</span>
-        <textarea
-          class="field-sizing-content min-h-[calc(4lh+1.25rem+2px)] w-full rounded-md border border-border bg-background px-4 py-2.5 text-base resize-y"
-          rows="4"
+      </Field>
+      <Field label="Details">
+        <TextArea
           name="details"
           value={details()}
           onInput={(event) => setDetails(event.currentTarget.value)}
         />
-      </label>
+      </Field>
       <label class="flex items-center gap-2 px-4">
         <input type="checkbox" checked={repeats()} onChange={(event) => setRepeats(event.currentTarget.checked)} />
         Repeats
       </label>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">{repeats() ? "Repeats next on" : "Date"}</span>
-        <input
-          class="w-auto justify-self-stretch rounded-md border border-border bg-background px-4 py-2.5 text-base"
+      <Field label={repeats() ? "Repeats next on" : "Date"}>
+        <Input
           name="date"
           type="date"
           max={taskDateOneYearFromToday()}
           value={date()}
           onInput={(event) => setDate(event.currentTarget.value)}
         />
-      </label>
+      </Field>
       <Show when={repeats()}>
-        <fieldset>
-          <legend class="mb-1 px-4 text-sm text-foreground-muted">Repeats every</legend>
+        <Fieldset legend="Repeats every">
           <div class="grid grid-cols-2 gap-2">
-            <input
-              class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+            <Input
               name="interval"
               type="number"
               min="1"
@@ -106,8 +102,7 @@ export default function TaskCreator(props: {
               value={interval()}
               onInput={(event) => setInterval(event.currentTarget.valueAsNumber)}
             />
-            <select
-              class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base"
+            <Select
               name="intervalUnit"
               value={intervalUnit()}
               onChange={(event) => changeIntervalUnit(event.currentTarget.value as IntervalUnit)}
@@ -116,9 +111,9 @@ export default function TaskCreator(props: {
               <option value="Weeks">Weeks</option>
               <option value="Months">Months</option>
               <option value="Years">Years</option>
-            </select>
+            </Select>
           </div>
-        </fieldset>
+        </Fieldset>
       </Show>
     </main>
   );

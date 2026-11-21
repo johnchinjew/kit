@@ -1,3 +1,6 @@
+import Field from "./components/Field";
+import Input from "./components/Input";
+import TextArea from "./components/TextArea";
 import TextButton from "./components/TextButton";
 import { createSignal, Show, type JSX } from "solid-js";
 import type { SignedIn } from "./session";
@@ -138,32 +141,25 @@ export default function TaskEditor(props: {
           </TextButton>
         </Show>
       </header>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Title</span>
-        <input
-          class="w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
+      <Field label="Title">
+        <Input
           name="title"
           type="text"
           value={draft().title}
           readOnly={props.task.completedAt !== null}
           onInput={onChangeTitle}
         />
-      </label>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Details</span>
-        <textarea
-          class="field-sizing-content min-h-[calc(4lh+1.25rem+2px)] w-full rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border resize-y"
-          rows="4"
+      </Field>
+      <Field label="Details">
+        <TextArea
           name="details"
           value={draft().details}
           readOnly={props.task.completedAt !== null}
           onInput={onChangeDetails}
         />
-      </label>
-      <label class="grid gap-1 text-sm">
-        <span class="px-4 text-foreground-muted">Date</span>
-        <input
-          class="w-auto justify-self-stretch rounded-md border border-border bg-background px-4 py-2.5 text-base read-only:bg-border"
+      </Field>
+      <Field label="Date">
+        <Input
           name="date"
           type="date"
           max={taskDateOneYearFromToday()}
@@ -171,7 +167,7 @@ export default function TaskEditor(props: {
           readOnly={props.task.completedAt !== null}
           onInput={onChangeDate}
         />
-      </label>
+      </Field>
       <div class="justify-self-end">
         <TextButton onClick={onClickDelete}>
           Delete
