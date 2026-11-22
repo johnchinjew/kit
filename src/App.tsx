@@ -3,6 +3,7 @@ import TaskCreator from "./TaskCreator";
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
 import Button from "./components/Button";
+import TextButton from "./components/TextButton";
 import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
@@ -235,10 +236,8 @@ function ActionBar(props: {
   openTaskCreator: () => void;
 }) {
   return (
-    <div class="order-last sticky bottom-0 mt-auto mx-auto w-full max-w-lg px-4 pt-4">
-      <div class="bg-background pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <Button onClick={props.openTaskCreator}>＋ Task</Button>
-      </div>
+    <div class="order-last isolate sticky bottom-0 mt-auto mx-auto flex justify-center w-full max-w-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] before:content-[''] before:absolute before:inset-0 before:-top-8 before:-z-10 before:pointer-events-none before:bg-background before:[mask-image:linear-gradient(to_bottom,transparent,rgb(0_0_0_/_70%)_1.5rem,rgb(0_0_0_/_90%)_2.25rem,black_3rem)]">
+      <TextButton onClick={props.openTaskCreator}>＋ Task</TextButton>
     </div>
   );
 }
