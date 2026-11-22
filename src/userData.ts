@@ -2,10 +2,10 @@ import {
   doc,
   deleteField,
   getFirestore,
-  onSnapshot,
   setDoc,
   Timestamp,
 } from "firebase/firestore";
+import { onSnapshotAfterWaitingForServer } from "./firestore";
 import type { Task } from "./task";
 import {
   occurrenceDates,
@@ -200,7 +200,7 @@ export function subscribeUserData(
   onUserData: (userData: UserData) => void,
   onError: (error: Error) => void,
 ) {
-  return onSnapshot(doc(getFirestore(), "users", userId), (snapshot) => {
+  return onSnapshotAfterWaitingForServer(doc(getFirestore(), "users", userId), (snapshot) => {
     let userData: UserData;
     try {
       userData = decodeUserData(snapshot.data());

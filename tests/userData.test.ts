@@ -2,7 +2,6 @@ import {
   doc,
   deleteField,
   getFirestore,
-  onSnapshot,
   setDoc,
   Timestamp,
   type DocumentData,
@@ -10,6 +9,7 @@ import {
   type DocumentSnapshot,
   type Firestore,
 } from "firebase/firestore";
+import { onSnapshotAfterWaitingForServer } from "../src/firestore";
 import { nextOccurrenceDate } from "../src/repeatingTask";
 import { decodeTaskDate, taskDateToday } from "../src/taskDate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,11 +31,12 @@ import {
   type UserData,
 } from "../src/userData";
 
+vi.mock("../src/firestore", () => ({ onSnapshotAfterWaitingForServer: vi.fn() }));
+
 vi.mock("firebase/firestore", async (importOriginal) => ({
   ...await importOriginal<typeof import("firebase/firestore")>(),
   doc: vi.fn(),
   getFirestore: vi.fn(),
-  onSnapshot: vi.fn(),
   setDoc: vi.fn(),
 }));
 
@@ -401,13 +402,13 @@ describe("User data: subscription", () => {
 
   it("subscribes to the specified user's document and returns its cleanup", () => {
     const unsubscribe = vi.fn();
-    vi.mocked(onSnapshot).mockReturnValue(unsubscribe);
+    vi.mocked(onSnapshotAfterWaitingForServer).mockReturnValue(unsubscribe);
     const onUserData = vi.fn();
     const onError = vi.fn();
 
     expect(subscribeUserData("alice", onUserData, onError)).toBe(unsubscribe);
     expect(doc).toHaveBeenCalledExactlyOnceWith(firestore, "users", "alice");
-    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith(
+    expect(onSnapshotAfterWaitingForServer).toHaveBeenCalledExactlyOnceWith(
       userDocument, expect.any(Function), onError,
     );
   });
@@ -415,7 +416,7 @@ describe("User data: subscription", () => {
   it("reads task IDs and titles and follows subsequent snapshots", () => {
     const onUserData = vi.fn();
     subscribeUserData("alice", onUserData, vi.fn());
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
     receive({
@@ -448,7 +449,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
     receive({
@@ -474,7 +475,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
     receive({
       data: () => ({
@@ -502,7 +503,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
     for (const [completed, milliseconds] of [[true, 1000], [false, 2000], [true, 3000]] as const) {
@@ -527,7 +528,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as (snapshot: DocumentSnapshot) => void;
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as (snapshot: DocumentSnapshot) => void;
     receive({
       data: () => ({
         tasks: {
@@ -547,7 +548,7 @@ describe("User data: subscription", () => {
       const onUserData = vi.fn();
       const onError = vi.fn();
       subscribeUserData("alice", onUserData, onError);
-      const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
         (snapshot: DocumentSnapshot) => void;
 
       receive({
@@ -569,7 +570,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
     receive({
@@ -592,7 +593,7 @@ describe("User data: subscription", () => {
       const onUserData = vi.fn();
       const onError = vi.fn();
       subscribeUserData("alice", onUserData, onError);
-      const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
         (snapshot: DocumentSnapshot) => void;
 
       receive({ data: () => data } as unknown as DocumentSnapshot);
@@ -608,7 +609,7 @@ describe("User data: subscription", () => {
       const onUserData = vi.fn();
       const onError = vi.fn();
       subscribeUserData("alice", onUserData, onError);
-      const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+      const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
         (snapshot: DocumentSnapshot) => void;
 
       receive({ data: () => data } as unknown as DocumentSnapshot);
@@ -632,7 +633,7 @@ describe("User data: subscription", () => {
         const onUserData = vi.fn();
         const onError = vi.fn();
         subscribeUserData("alice", onUserData, onError);
-        const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+        const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
           (snapshot: DocumentSnapshot) => void;
         const valid = { tasks: { valid: { title: "Buy milk", details: "", completed: false, date: "2026-10-04" } } };
 
@@ -668,7 +669,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
     receive({
@@ -686,7 +687,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn(() => { throw error; });
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.calls[0]![1] as
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.calls[0]![1] as
       (snapshot: DocumentSnapshot) => void;
 
     expect(() => receive({ data: () => ({}) } as DocumentSnapshot)).toThrow(error);
@@ -697,7 +698,7 @@ describe("User data: subscription", () => {
     const onUserData = vi.fn();
     const onError = vi.fn();
     subscribeUserData("alice", onUserData, onError);
-    const receive = vi.mocked(onSnapshot).mock.lastCall![1] as (snapshot: DocumentSnapshot) => void;
+    const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.lastCall![1] as (snapshot: DocumentSnapshot) => void;
     receive({ data: () => ({ repeatingTasks: { test: data } }) } as unknown as DocumentSnapshot);
     if (onError.mock.calls.length) throw onError.mock.calls[0]![0];
     return onUserData.mock.calls[0]![0].repeatingTasks.test;
