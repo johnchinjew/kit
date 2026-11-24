@@ -6,7 +6,7 @@ Just a to-do list.
 
 - Schedule list: all incomplete tasks and 1 year of occurrences for all repeating tasks, ordered by date.
 - Open list: all incomplete tasks, ordered by date. Each repeating task appears only once on its next occurrence date.
-- Completed list: all completed tasks, ordered by completion date. Tasks are deleted 1 year after completion.
+- Completed list: all completed tasks, ordered by completion date. Tasks are deleted 400 days after completion.
 - Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task is fully
   independent of that repeating task. Every task must have a date (up to 1 year away).
 - Repeating task: title, details, next occurrence date, and repetition interval (up to 1 year away). Cannot be
@@ -64,5 +64,4 @@ When changing domain, logo, privacy policy URL, or other branding details, remem
 - Failed saves show an error after closing the editor, without preserving the draft for recovery.
 - Firestore rules validate selected timestamps but do not restrict writes to the intended fields or validate the schema
   of incoming data.
-- Completed tasks are not yet automatically deleted after one year.
 - There is no recovery strategy for hitting the Firestore document size limit.

@@ -796,13 +796,17 @@ describe("User data: tasks from repeating tasks", () => {
     const creation = new Promise<void>((resolve) => { finishCreation = resolve; });
     const advancement = new Promise<void>((resolve) => { finishAdvancement = resolve; });
     vi.mocked(setDoc).mockReturnValueOnce(creation).mockReturnValueOnce(advancement);
-    const processing = createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { walk: {
-      title: "Walk", details: "",
-      schedule: {
-        nextDate: decodeTaskDate("2026-03-30"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-03-30"),
-      },
-      scheduleEditedAt: Timestamp.now(),
-    } } });
+    const processing = createTasksFromRepeatingTasks("alice", {
+      tasks: {}, repeatingTasks: {
+        walk: {
+          title: "Walk", details: "",
+          schedule: {
+            nextDate: decodeTaskDate("2026-03-30"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-03-30"),
+          },
+          scheduleEditedAt: Timestamp.now(),
+        }
+      }
+    });
 
     expect(setDoc).toHaveBeenCalledTimes(4);
     finishCreation();
@@ -814,13 +818,17 @@ describe("User data: tasks from repeating tasks", () => {
   });
 
   it.each(["creation", "advancement"])("reports a %s failure after queuing all writes", async (failure) => {
-    const data: UserData = { tasks: {}, repeatingTasks: { walk: {
-      title: "Walk", details: "",
-      schedule: {
-        nextDate: decodeTaskDate("2026-03-29"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-03-29"),
-      },
-      scheduleEditedAt: Timestamp.now(),
-    } } };
+    const data: UserData = {
+      tasks: {}, repeatingTasks: {
+        walk: {
+          title: "Walk", details: "",
+          schedule: {
+            nextDate: decodeTaskDate("2026-03-29"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-03-29"),
+          },
+          scheduleEditedAt: Timestamp.now(),
+        }
+      }
+    };
     const error = new Error("Write rejected");
     if (failure === "advancement") vi.mocked(setDoc).mockResolvedValueOnce(undefined);
     vi.mocked(setDoc).mockRejectedValueOnce(error);
@@ -829,4 +837,18 @@ describe("User data: tasks from repeating tasks", () => {
 
     expect(setDoc).toHaveBeenCalledTimes(6);
   });
+});
+
+it.each([
+  { fromCache: true, hasPendingWrites: false },
+  { fromCache: true, hasPendingWrites: true },
+  { fromCache: false, hasPendingWrites: true },
+  { fromCache: false, hasPendingWrites: false },
+])("delivers snapshots regardless of their source or pending writes: %j", (metadata) => {
+  vi.resetAllMocks();
+  const onData = vi.fn();
+  subscribeUserData("alice", onData, vi.fn());
+  const receive = vi.mocked(onSnapshotAfterWaitingForServer).mock.lastCall![1] as (snapshot: DocumentSnapshot) => void;
+  receive({ data: () => ({}), metadata } as DocumentSnapshot);
+  expect(onData).toHaveBeenCalledExactlyOnceWith({ tasks: {}, repeatingTasks: {} });
 });

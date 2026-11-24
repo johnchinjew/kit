@@ -8,3 +8,11 @@ export type Task = {
   completedAt: Timestamp | null;
 };
 
+export function taskRetentionElapsed(task: Task, now: Timestamp): boolean {
+  if (task.completedAt === null) {
+    return false;
+  }
+  const elapsedSeconds = now.seconds - task.completedAt.seconds;
+  const retentionSeconds = 400 * 24 * 60 * 60;
+  return elapsedSeconds >= retentionSeconds;
+}

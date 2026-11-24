@@ -6,7 +6,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { createSession, type Session } from "../src/session";
 import { decodeTaskDate } from "../src/taskDate";
-import { createRepeatingTask, createTasksFromRepeatingTasks, createTask, subscribeUserData, type UserData } from "../src/userData";
+import {
+  createRepeatingTask,
+  createTasksFromRepeatingTasks,
+  createTask,
+  deleteTasksWithElapsedRetention,
+  subscribeUserData,
+  type UserData
+} from "../src/userData";
 
 vi.mock("../src/session", () => ({
   createSession: vi.fn(() => ({
@@ -22,6 +29,7 @@ vi.mock("../src/userData", async (importOriginal) => ({
   createTask: vi.fn(),
   createRepeatingTask: vi.fn(),
   createTasksFromRepeatingTasks: vi.fn(),
+  deleteTasksWithElapsedRetention: vi.fn(),
 }));
 
 let dispose: (() => void) | undefined;
@@ -29,6 +37,7 @@ let dispose: (() => void) | undefined;
 beforeEach(() => {
   vi.resetAllMocks();
   vi.setSystemTime(new Date(2026, 10, 4, 12));
+  vi.mocked(deleteTasksWithElapsedRetention).mockResolvedValue(undefined);
   vi.mocked(createTask).mockResolvedValue(undefined);
   vi.mocked(createRepeatingTask).mockResolvedValue(undefined);
   vi.mocked(createTasksFromRepeatingTasks).mockResolvedValue(undefined);
@@ -62,14 +71,18 @@ it("only shows the pre-alpha notice on the sign-in screen", () => {
 });
 
 it.each([false, true])("only processes the first snapshot, with initial due tasks=%s", async (initiallyDue) => {
-  const data: UserData = { tasks: {}, repeatingTasks: { rent: {
-    title: "Rent", details: "",
-    schedule: {
-      nextDate: decodeTaskDate("2026-11-04"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-11-04"),
-    },
-    scheduleEditedAt: Timestamp.now(),
-  } } };
-  let receive: (data: UserData) => void = () => {};
+  const data: UserData = {
+    tasks: {}, repeatingTasks: {
+      rent: {
+        title: "Rent", details: "",
+        schedule: {
+          nextDate: decodeTaskDate("2026-11-04"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-11-04"),
+        },
+        scheduleEditedAt: Timestamp.now(),
+      }
+    }
+  };
+  let receive: (data: UserData) => void = () => { };
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     receive(initiallyDue ? data : { tasks: {}, repeatingTasks: {} });
@@ -92,14 +105,18 @@ it("shows startup recurrence failures and does not retry on later snapshots", as
   vi.mocked(createTasksFromRepeatingTasks).mockReturnValue(new Promise<void>((_resolve, reject) => {
     rejectProcessing = reject;
   }));
-  const data: UserData = { tasks: {}, repeatingTasks: { rent: {
-    title: "Rent", details: "",
-    schedule: {
-      nextDate: decodeTaskDate("2026-11-02"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-11-02"),
-    },
-    scheduleEditedAt: Timestamp.now(),
-  } } };
-  let receive: (data: UserData) => void = () => {};
+  const data: UserData = {
+    tasks: {}, repeatingTasks: {
+      rent: {
+        title: "Rent", details: "",
+        schedule: {
+          nextDate: decodeTaskDate("2026-11-02"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-11-02"),
+        },
+        scheduleEditedAt: Timestamp.now(),
+      }
+    }
+  };
+  let receive: (data: UserData) => void = () => { };
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     receive(data);
@@ -121,13 +138,15 @@ it("orders completed tasks by completion instant and displays completion dates",
   const newer = Timestamp.fromDate(new Date("2026-10-05T12:00:00Z"));
   const newest = new Timestamp(newer.seconds, newer.nanoseconds + 1);
   vi.mocked(subscribeUserData).mockImplementation((_userId, onUserData) => {
-    onUserData({ tasks: {
-      older: { title: "Older", details: "", date: decodeTaskDate("2026-10-08"), completedAt: older },
-      newer: { title: "Newer", details: "", date: decodeTaskDate("2026-10-07"), completedAt: newer },
-      newest: { title: "Newest", details: "Finished the report", date: decodeTaskDate("2026-10-09"), completedAt: newest },
-      later: { title: "Later", details: "", completedAt: null, date: decodeTaskDate("2026-10-06") },
-      earlier: { title: "Earlier", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") },
-    }, repeatingTasks: {} });
+    onUserData({
+      tasks: {
+        older: { title: "Older", details: "", date: decodeTaskDate("2026-10-08"), completedAt: older },
+        newer: { title: "Newer", details: "", date: decodeTaskDate("2026-10-07"), completedAt: newer },
+        newest: { title: "Newest", details: "Finished the report", date: decodeTaskDate("2026-10-09"), completedAt: newest },
+        later: { title: "Later", details: "", completedAt: null, date: decodeTaskDate("2026-10-06") },
+        earlier: { title: "Earlier", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") },
+      }, repeatingTasks: {}
+    });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
@@ -153,9 +172,11 @@ it.each([
 ])("shows completed tasks with a $label label", ({ day, label }) => {
   const completedAt = Timestamp.fromDate(new Date(2026, 10, day, 23, 30));
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
-    onData({ tasks: {
-      done: { title: "Done", details: "", date: decodeTaskDate("2026-10-01"), completedAt },
-    }, repeatingTasks: {} });
+    onData({
+      tasks: {
+        done: { title: "Done", details: "", date: decodeTaskDate("2026-10-01"), completedAt },
+      }, repeatingTasks: {}
+    });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
@@ -171,7 +192,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   const completedAt = completed ? Timestamp.now() : null;
   const task = { title: "Deleted task", details: "", date: decodeTaskDate("2026-10-07"), completedAt };
   const remaining = { ...task, title: "Remaining task" };
-  let receive: (data: UserData) => void = () => {};
+  let receive: (data: UserData) => void = () => { };
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     receive({ tasks: { selected: task, remaining }, repeatingTasks: {} });
@@ -345,15 +366,17 @@ it.each([false, true])("creates the finished draft only on Back, with repeat=%s"
 
 it("projects a repeating task separately from its generated tasks", () => {
   vi.mocked(subscribeUserData).mockImplementation((_userId, onUserData) => {
-    onUserData({ tasks: {}, repeatingTasks: {
-      rent: {
-        title: "Rent", details: "",
-        schedule: {
-          nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Weeks", anchorDate: decodeTaskDate("2026-11-05"),
+    onUserData({
+      tasks: {}, repeatingTasks: {
+        rent: {
+          title: "Rent", details: "",
+          schedule: {
+            nextDate: decodeTaskDate("2026-11-05"), interval: 1, intervalUnit: "Weeks", anchorDate: decodeTaskDate("2026-11-05"),
+          },
+          scheduleEditedAt: Timestamp.now(),
         },
-        scheduleEditedAt: Timestamp.now(),
-      },
-    } });
+      }
+    });
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
@@ -380,7 +403,7 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
     },
     scheduleEditedAt: Timestamp.now(),
   };
-  let receive: (data: UserData) => void = () => {};
+  let receive: (data: UserData) => void = () => { };
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     receive({ tasks: { task }, repeatingTasks: { repeating: repeatingTask } });
@@ -453,4 +476,41 @@ it.each(["Schedule", "Open"])("sorts incomplete tasks and repeating occurrences 
   } else {
     expect(rows).toHaveLength(3);
   }
+});
+
+
+it("applies task retention to the first snapshot once per subscription", async () => {
+  const data: UserData = { tasks: {}, repeatingTasks: {} };
+  const [session, setSession] = createSignal<Session>({ status: "SignedIn", user: { userId: "alice", photoUrl: null } });
+  vi.mocked(createSession).mockReturnValueOnce({ session, signIn: vi.fn(), signOut: vi.fn() });
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData(data);
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  expect(deleteTasksWithElapsedRetention).toHaveBeenCalledExactlyOnceWith("alice", data);
+
+  const onData = vi.mocked(subscribeUserData).mock.lastCall![1]!;
+  onData(data);
+  onData(data);
+  await Promise.resolve();
+  expect(deleteTasksWithElapsedRetention).toHaveBeenCalledExactlyOnceWith("alice", data);
+
+  setSession({ status: "SignedOut" });
+  setSession({ status: "SignedIn", user: { userId: "bob", photoUrl: null } });
+  vi.mocked(subscribeUserData).mock.lastCall![1]!(data);
+  expect(deleteTasksWithElapsedRetention).toHaveBeenLastCalledWith("bob", data);
+  expect(deleteTasksWithElapsedRetention).toHaveBeenCalledTimes(2);
+});
+
+it("reports retention cleanup failures without retrying on every snapshot", async () => {
+  vi.mocked(deleteTasksWithElapsedRetention).mockRejectedValueOnce(new Error("Offline"));
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  const onData = vi.mocked(subscribeUserData).mock.lastCall![1]!;
+  const data: UserData = { tasks: {}, repeatingTasks: {} };
+  onData(data);
+  await vi.waitFor(() => expect(document.body.textContent).toContain("Could not complete clean up."));
+  onData(data);
+  expect(deleteTasksWithElapsedRetention).toHaveBeenCalledTimes(1);
 });

@@ -12,6 +12,7 @@ import { createNotice } from "./notice";
 import { createSession, type SignedIn } from "./session";
 import {
   createTasksFromRepeatingTasks,
+  deleteTasksWithElapsedRetention,
   emptyUserData,
   subscribeUserData,
   type UserData,
@@ -73,6 +74,7 @@ function AppSignedIn(props: {
     setUserData(emptyUserData());
 
     let requestedTaskCreationFromRepeatingTasks = false;
+    let requestedDeletionForTasksWithElapsedRetention = false;
 
     const unsubscribe = subscribeUserData(props.session.user.userId, (data) => untrack(() => {
       // Close the editor if the item was deleted.
@@ -88,6 +90,13 @@ function AppSignedIn(props: {
         requestedTaskCreationFromRepeatingTasks = true;
         void createTasksFromRepeatingTasks(props.session.user.userId, data).catch(() => {
           props.showNotice("Could not update repeating tasks. Please close and reopen Kit.");
+        });
+      }
+
+      if (!requestedDeletionForTasksWithElapsedRetention) {
+        requestedDeletionForTasksWithElapsedRetention = true;
+        void deleteTasksWithElapsedRetention(props.session.user.userId, data).catch(() => {
+          props.showNotice("Could not complete clean up. Please close and reopen Kit.");
         });
       }
     }), () => {
@@ -361,6 +370,7 @@ function CompletedList(props: {
 }) {
   return (
     <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
+      <p class="px-4 pb-4 text-center text-sm text-foreground-muted">Completed tasks are automatically deleted 1 year after their completion date.</p>
       <ul class="divide-y divide-border px-4">
         <For each={completedRows(props.userData)}>
           {(row) => (

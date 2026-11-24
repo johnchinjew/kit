@@ -6,7 +6,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { onSnapshotAfterWaitingForServer } from "./firestore";
-import type { Task } from "./task";
+import { taskRetentionElapsed, type Task } from "./task";
 import {
   occurrenceDates,
   maxInterval,
@@ -132,6 +132,33 @@ export async function reopenTask(userId: string, taskId: string): Promise<void> 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
   await setDoc(doc(getFirestore(), "users", userId), {
     operation: { type: "DeleteTask", taskId },
+    tasks: { [taskId]: deleteField() },
+  }, { merge: true });
+}
+
+export async function deleteTasksWithElapsedRetention(userId: string, data: UserData): Promise<void> {
+  const now = Timestamp.now();
+
+  // setDoc() immediately applies the mutation locally, but its promise does not resolve until the server accepts.
+  // To avoid getting stuck at the first write while offline, submit all the writes before awaiting their promises.
+  const writes: Promise<void>[] = [];
+  for (const [taskId, task] of Object.entries(data.tasks)) {
+    if (taskRetentionElapsed(task, now)) {
+      writes.push(deleteTaskWithElapsedRetention(userId, taskId, task));
+    }
+  }
+  // Await everything here so the caller can catch errors when the server responds, i.e. when online.
+  await Promise.all(writes);
+}
+
+async function deleteTaskWithElapsedRetention(userId: string, taskId: string, task: Task): Promise<void> {
+  await setDoc(doc(getFirestore(), "users", userId), {
+    operation: {
+      type: "DeleteTaskWithElapsedRetention",
+      taskId,
+      // Firestore accepts the deletion only if the task is still completed with this completion timestamp, or is already deleted.
+      completedAt: task.completedAt,
+    },
     tasks: { [taskId]: deleteField() },
   }, { merge: true });
 }
