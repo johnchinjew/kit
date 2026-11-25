@@ -1,4 +1,16 @@
-import { createEffect, createSignal, For, Match, onCleanup, onMount, Show, Switch, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  untrack
+} from "solid-js";
+import { containsSearchPhrase } from "./search";
 import TaskCreator from "./TaskCreator";
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
@@ -54,12 +66,17 @@ function AppLoading() {
 
 // SIGNED IN
 
-type ListMode = "Schedule" | "Open" | "Completed";
 type View =
   | { type: "List"; }
   | { type: "TaskCreator"; }
   | { type: "TaskEditor"; taskId: string; }
   | { type: "RepeatingTaskEditor"; repeatingTaskId: string; };
+
+type ListMode =
+  | { type: "Search"; phrase: string; }
+  | { type: "Schedule"; }
+  | { type: "Open"; }
+  | { type: "Completed"; };
 
 function AppSignedIn(props: {
   session: SignedIn;
@@ -67,7 +84,7 @@ function AppSignedIn(props: {
   showNotice: (message: string) => void;
 }) {
   const [view, setView] = createSignal<View>({ type: "List" });
-  const [listMode, setListMode] = createSignal<ListMode>("Schedule");
+  const [listMode, setListMode] = createSignal<ListMode>({ type: "Schedule" });
   const [userData, setUserData] = createSignal<UserData>(emptyUserData());
 
   createEffect(() => {
@@ -173,24 +190,38 @@ function List(props: {
   setView: (view: View) => void;
   openTaskCreator: () => void;
 }) {
+  // Use memo to avoid updating stuff that only depends on the list mode type i.e. stuff that doesn't need to be updated
+  // when the user is typing in the search bar.
+  const listModeType = createMemo(() => props.listMode.type);
+
   return (
     <div class="min-h-dvh flex flex-col">
       <MenuBar
-        listMode={props.listMode}
+        listMode={listModeType()}
         photoUrl={props.photoUrl}
         signOut={props.signOut}
         setListMode={props.setListMode}
       />
       <Switch>
-        <Match when={props.listMode === "Schedule"}>
+        <Match when={props.listMode.type === "Search" && props.listMode}>
+          {(search) => (
+            <SearchList
+              userData={props.userData}
+              phrase={search().phrase}
+              setPhrase={(phrase) => props.setListMode({ type: "Search", phrase })}
+              setView={props.setView}
+            />
+          )}
+        </Match>
+        <Match when={listModeType() === "Schedule"}>
           <ActionBar openTaskCreator={props.openTaskCreator} />
           <ScheduleList userData={props.userData} setView={props.setView} />
         </Match>
-        <Match when={props.listMode === "Open"}>
+        <Match when={listModeType() === "Open"}>
           <ActionBar openTaskCreator={props.openTaskCreator} />
           <OpenList userData={props.userData} setView={props.setView} />
         </Match>
-        <Match when={props.listMode === "Completed"}>
+        <Match when={listModeType() === "Completed"}>
           <CompletedList userData={props.userData} setView={props.setView} />
         </Match>
       </Switch>
@@ -199,7 +230,7 @@ function List(props: {
 }
 
 function MenuBar(props: {
-  listMode: ListMode;
+  listMode: ListMode["type"];
   photoUrl: string | null;
   signOut: () => void;
   setListMode: (mode: ListMode) => void;
@@ -242,7 +273,7 @@ function MenuBar(props: {
 }
 
 function ListModeSelector(props: {
-  listMode: ListMode;
+  listMode: ListMode["type"];
   setListMode: (mode: ListMode) => void;
 }) {
   return (
@@ -251,9 +282,14 @@ function ListModeSelector(props: {
       value={props.listMode}
       onChange={(event) => {
         const mode = event.currentTarget.value;
-        if (mode === "Schedule" || mode === "Open" || mode === "Completed") props.setListMode(mode);
+        if (mode === "Search") {
+          props.setListMode({ type: "Search", phrase: "" });
+        } else if (mode === "Schedule" || mode === "Open" || mode === "Completed") {
+          props.setListMode({ type: mode });
+        }
       }}
     >
+      <option value="Search">Search</option>
       <option value="Schedule">Schedule</option>
       <option value="Open">Open</option>
       <option value="Completed">Completed</option>
@@ -288,6 +324,113 @@ function ActionBar(props: {
       <TextButton onClick={props.openTaskCreator}>＋ Task</TextButton>
     </div>
   );
+}
+
+type SearchRow =
+  | { type: "Task"; taskId: string; title: string; details: string; date: TaskDate; }
+  | { type: "RepeatingTask"; repeatingTaskId: string; title: string; details: string; date: TaskDate; }
+  | { type: "CompletedTask"; taskId: string; title: string; details: string; date: TaskDate; completedAt: Timestamp; };
+
+function SearchList(props: {
+  userData: UserData;
+  phrase: string;
+  setPhrase: (phrase: string) => void;
+  setView: (view: View) => void;
+}) {
+  let input!: HTMLInputElement;
+
+  return (
+    <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
+      <div class="relative mb-4">
+        <input
+          ref={input}
+          type="text"
+          aria-label="Search"
+          placeholder="Search"
+          class="w-full rounded-md border border-border bg-background pl-4 pr-10 py-2.5"
+          value={props.phrase}
+          onInput={(event) => props.setPhrase(event.currentTarget.value)}
+        />
+        <Show when={props.phrase}>
+          <button
+            type="button"
+            aria-label="Clear search"
+            class="absolute right-0 top-0 h-full px-4 cursor-pointer"
+            onClick={() => {
+              props.setPhrase("");
+              input.focus();
+            }}
+          >
+            ×
+          </button>
+        </Show>
+      </div>
+      <ul class="divide-y divide-border px-4">
+        <For each={searchRows(props.userData, props.phrase)}>
+          {(row) => {
+            switch (row.type) {
+              case "Task":
+                return (
+                  <li class="py-4 first:pt-0 last:pb-0">
+                    <TaskRow
+                      title={row.title}
+                      details={row.details}
+                      date={row.date}
+                      onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
+                    />
+                  </li>
+                );
+              case "RepeatingTask":
+                return (
+                  <li class="py-4 first:pt-0 last:pb-0">
+                    <RepeatingTaskRow
+                      title={row.title}
+                      details={row.details}
+                      date={row.date}
+                      onClick={() => props.setView({ type: "RepeatingTaskEditor", repeatingTaskId: row.repeatingTaskId })}
+                    />
+                  </li>
+                );
+              case "CompletedTask":
+                return (
+                  <li class="py-4 first:pt-0 last:pb-0">
+                    <CompletedTaskRow
+                      title={row.title}
+                      completedAt={row.completedAt}
+                      onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
+                    />
+                  </li>
+                );
+            }
+          }}
+        </For>
+      </ul>
+    </main>
+  );
+}
+
+function searchRows(data: UserData, phrase: string): SearchRow[] {
+  const taskRows: SearchRow[] = Object.entries(data.tasks)
+    .map(([taskId, task]) =>
+      task.completedAt === null
+        ? { type: "Task", taskId, title: task.title, details: task.details, date: task.date }
+        : { type: "CompletedTask", taskId, title: task.title, details: task.details, date: task.date, completedAt: task.completedAt }
+    );
+  const repeatingTaskRows: SearchRow[] = Object.entries(data.repeatingTasks)
+    .map(([repeatingTaskId, repeatingTask]) => ({
+      type: "RepeatingTask",
+      repeatingTaskId,
+      title: repeatingTask.title,
+      details: repeatingTask.details,
+      date: repeatingTask.schedule.nextDate,
+    }));
+  return [...taskRows, ...repeatingTaskRows]
+    .filter((row) => containsSearchPhrase(row.title, phrase) || containsSearchPhrase(row.details, phrase))
+    .sort((left, right) => {
+      if (left.type === "CompletedTask" && right.type !== "CompletedTask") return 1;
+      if (left.type !== "CompletedTask" && right.type === "CompletedTask") return -1;
+      return left.date.localeCompare(right.date) || left.title.localeCompare(right.title);
+    });
 }
 
 type ScheduleRow =

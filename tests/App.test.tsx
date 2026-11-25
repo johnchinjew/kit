@@ -571,3 +571,207 @@ it("reports retention cleanup failures without retrying on every snapshot", asyn
   onData(data);
   expect(deleteTasksWithElapsedRetention).toHaveBeenCalledTimes(1);
 });
+
+it("offers Search first while defaulting to Schedule, and clears the search phrase", () => {
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData({ tasks: {
+      task: { title: "Laundry", details: "Sheets", date: decodeTaskDate("2026-11-04"), completedAt: null },
+    }, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  expect(select.value).toBe("Schedule");
+  expect(select.options[0]!.value).toBe("Search");
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  expect(document.querySelector('[aria-label="Clear search"]')).toBeNull();
+  input.value = "missing";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(document.querySelectorAll("li")).toHaveLength(0);
+  document.querySelector<HTMLButtonElement>('[aria-label="Clear search"]')!.click();
+  expect(input.value).toBe("");
+  expect(document.activeElement).toBe(input);
+  expect(document.querySelectorAll("li")).toHaveLength(1);
+  expect(document.querySelector('[aria-label="Clear search"]')).toBeNull();
+});
+
+
+it("clears the search phrase when switching list modes", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  input.value = "Laundry";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+
+  select.value = "Open";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  expect(document.querySelector<HTMLInputElement>('[aria-label="Search"]')!.value).toBe("");
+  expect(document.querySelector('[aria-label="Clear search"]')).toBeNull();
+});
+
+it("keeps the search input focused while typing and preserves the phrase across an editor visit", () => {
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData({ tasks: {
+      task: { title: "Laundry", details: "Sheets", date: decodeTaskDate("2026-11-04"), completedAt: null },
+    }, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  input.focus();
+  for (const phrase of ["L", "La", "Lau"]) {
+    input.value = phrase;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(document.querySelector('[aria-label="Search"]')).toBe(input);
+    expect(document.activeElement).toBe(input);
+    expect(select.value).toBe("Search");
+  }
+  document.querySelector<HTMLButtonElement>("li button")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  expect(document.querySelector<HTMLInputElement>('[aria-label="Search"]')!.value).toBe("Lau");
+  expect(document.querySelector("select")!.value).toBe("Search");
+});
+
+it("updates search results from live data without resetting the phrase or focus", () => {
+  const date = decodeTaskDate("2026-11-04");
+  let receive!: (data: UserData) => void;
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    receive({ tasks: {
+      original: { title: "Wash sheets", details: "", date, completedAt: null },
+    }, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  input.focus();
+  input.value = "wash";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(document.querySelector("li")!.textContent).toContain("Wash sheets");
+
+  receive({ tasks: {
+    original: { title: "Fold sheets", details: "", date, completedAt: null },
+    added: { title: "Wash towels", details: "", date, completedAt: null },
+    unrelated: { title: "Buy groceries", details: "", date, completedAt: null },
+  }, repeatingTasks: {} });
+
+  expect([...document.querySelectorAll("li button > span:first-child")].map(row => row.textContent)).toEqual(["Wash towels"]);
+  expect(document.querySelector('[aria-label="Search"]')).toBe(input);
+  expect(input.value).toBe("wash");
+  expect(document.activeElement).toBe(input);
+  expect(subscribeUserData).toHaveBeenCalledTimes(1);
+});
+
+it("mixes search results by status and task date and opens each kind in its editor", () => {
+  const date = decodeTaskDate("2026-11-04");
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData({ tasks: {
+      open: { title: "Wash towels", details: "Open details", date, completedAt: null },
+      doneLater: { title: "Wash blankets", details: "Later details", date: decodeTaskDate("2026-11-02"), completedAt: Timestamp.fromDate(new Date("2026-11-03T12:00:00Z")) },
+      doneEarlier: { title: "Wash sheets", details: "Earlier details", date: decodeTaskDate("2026-11-01"), completedAt: Timestamp.fromDate(new Date("2026-11-02T12:00:00Z")) },
+    }, repeatingTasks: {
+      repeat: { title: "Wash clothes", details: "Repeating details", schedule: {
+        nextDate: decodeTaskDate("2026-11-05"), anchorDate: date, interval: 1, intervalUnit: "Days",
+      }, scheduleEditedAt: Timestamp.now() },
+    } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  input.value = "wash";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+
+  expect([...document.querySelectorAll("li button > span:first-child")].map(row => row.textContent)).toEqual([
+    "Wash towels", "Wash clothes", "Wash sheets", "Wash blankets",
+  ]);
+  expect(document.querySelectorAll("li .line-through")).toHaveLength(2);
+
+  for (const expected of [
+    { title: "Wash towels", details: "Open details", repeating: false, completed: false },
+    { title: "Wash clothes", details: "Repeating details", repeating: true, completed: false },
+    { title: "Wash sheets", details: "Earlier details", repeating: false, completed: true },
+    { title: "Wash blankets", details: "Later details", repeating: false, completed: true },
+  ]) {
+    [...document.querySelectorAll<HTMLButtonElement>("li button")].find(button => button.querySelector("span")!.textContent === expected.title)!.click();
+    const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+    expect(title.value).toBe(expected.title);
+    expect(title.readOnly).toBe(expected.completed);
+    expect(document.querySelector<HTMLTextAreaElement>('[name="details"]')!.value).toBe(expected.details);
+    expect(document.querySelector('[name="intervalUnit"]') !== null).toBe(expected.repeating);
+    [...document.querySelectorAll("button")].find(button => button.textContent === "←")!.click();
+    expect(document.querySelector<HTMLInputElement>('[aria-label="Search"]')!.value).toBe("wash");
+  }
+});
+
+
+it("orders search matches by status, date, then title without relevance ranking", () => {
+  const date = decodeTaskDate("2026-11-04");
+  const data: UserData = { tasks: {
+    done: { title: "cat cat cat", details: "", date, completedAt: Timestamp.now() },
+    partial: { title: "caterpillar", details: "", date, completedAt: null },
+    details: { title: "Details", details: "cat", date, completedAt: null },
+    later: { title: "Cat zebra", details: "", date: decodeTaskDate("2026-11-05"), completedAt: null },
+    zebra: { title: "Cat zebra", details: "", date, completedAt: null },
+    alpha: { title: "Cat alpha", details: "", date, completedAt: null },
+    more: { title: "Cat cat", details: "", date, completedAt: null },
+  }, repeatingTasks: {} };
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData(data);
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  input.value = "cat";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  expect([...document.querySelectorAll("li button > span:first-child")].map(row => row.textContent)).toEqual([
+    "Cat alpha", "Cat cat", "Cat zebra", "caterpillar", "Details", "Cat zebra", "cat cat cat",
+  ]);
+});
+
+
+it("finds detail-only matches in open, completed, and repeating tasks", () => {
+  const date = decodeTaskDate("2026-11-04");
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    onData({ tasks: {
+      open: { title: "Groceries", details: "Buy café beans", date, completedAt: null },
+      completed: { title: "Shopping", details: "Bought café beans", date, completedAt: Timestamp.now() },
+      unrelated: { title: "Laundry", details: "Wash sheets", date, completedAt: null },
+    }, repeatingTasks: {
+      repeat: { title: "Subscription", details: "Order café beans", schedule: {
+        nextDate: date, anchorDate: date, interval: 1, intervalUnit: "Months",
+      }, scheduleEditedAt: Timestamp.now() },
+    } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const select = document.querySelector("select")!;
+  select.value = "Search";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  input.value = "  CAFE   beans ";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+
+  expect([...document.querySelectorAll("li button > span:first-child")].map(row => row.textContent)).toEqual([
+    "Groceries", "Subscription", "Shopping",
+  ]);
+});
