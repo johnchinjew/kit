@@ -68,14 +68,17 @@ it("shows a synchronized list selector after the header scrolls away and hides i
   dispose = render(() => <App />, document.body);
 
   const header = document.querySelector("header")!;
-  const original = header.querySelector("select")!;
+  const original = header.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
+  const findStickySelector = () => [...document.querySelectorAll<HTMLSelectElement>('select[aria-label="List selector"]')]
+    .find((select) => !header.contains(select));
   const observer = vi.mocked(IntersectionObserver).mock.instances[0]!;
   expect(observe).toHaveBeenCalledWith(header);
   expect(document.querySelectorAll("select")).toHaveLength(1);
 
   onIntersection([{ isIntersecting: false, boundingClientRect: { bottom: -1 } } as IntersectionObserverEntry], observer);
 
-  const sticky = document.querySelectorAll("select")[1]!;
+  expect(document.querySelectorAll("select")).toHaveLength(2);
+  const sticky = findStickySelector()!;
   expect(sticky.value).toBe("Schedule");
   expect(sticky.parentElement!.querySelectorAll("button")).toHaveLength(0);
   sticky.value = "Completed";
@@ -88,7 +91,8 @@ it("shows a synchronized list selector after the header scrolls away and hides i
   expect(original.value).toBe("Completed");
 
   onIntersection([{ isIntersecting: false, boundingClientRect: { bottom: -1 } } as IntersectionObserverEntry], observer);
-  expect(document.querySelectorAll("select")[1]!.value).toBe("Completed");
+  expect(document.querySelectorAll("select")).toHaveLength(2);
+  expect(findStickySelector()?.value).toBe("Completed");
   dispose!();
   dispose = undefined;
   expect(disconnect).toHaveBeenCalledOnce();
@@ -100,7 +104,7 @@ it("keeps list switching usable without IntersectionObserver", () => {
   dispose = render(() => <App />, document.body);
 
   expect(document.querySelectorAll("select")).toHaveLength(1);
-  const select = document.querySelector("header select") as HTMLSelectElement;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Completed";
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -211,7 +215,7 @@ it("orders completed tasks by completion instant and displays completion dates",
   expect([...document.querySelectorAll("li button > span:first-child")].map((title) => title.textContent)).toEqual(["Earlier", "Later"]);
   expect([...document.querySelectorAll("li time")].map((time) => time.getAttribute("datetime"))).toEqual(["2026-10-04", "2026-10-06"]);
 
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Completed";
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -237,7 +241,7 @@ it.each([
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Completed";
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -257,7 +261,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   });
   dispose = render(() => <App />, document.body);
   if (completed) {
-    const mode = document.querySelector("select")!;
+    const mode = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
     mode.value = "Completed";
     mode.dispatchEvent(new Event("change", { bubbles: true }));
   }
@@ -265,7 +269,7 @@ it.each([false, true])("returns to the list when the open task with completed=%s
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("Deleted task");
   receive({ tasks: { remaining }, repeatingTasks: {} });
   expect(document.querySelector('[name="title"]')).toBeNull();
-  expect(document.querySelector("select")!.value).toBe(completed ? "Completed" : "Schedule");
+  expect(document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!.value).toBe(completed ? "Completed" : "Schedule");
   expect(document.querySelector("li button > span:first-child")!.textContent).toBe("Remaining task");
   document.querySelector<HTMLButtonElement>("li button")!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("Remaining task");
@@ -278,7 +282,7 @@ it("discards an open task draft when the signed-in user changes", () => {
   const unsubscribeAlice = vi.fn();
   vi.mocked(subscribeUserData).mockReturnValueOnce(unsubscribeAlice).mockReturnValueOnce(vi.fn());
   dispose = render(() => <App />, document.body);
-  const add = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  const add = () => [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
 
   add();
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
@@ -295,14 +299,14 @@ it("discards an open task draft when the signed-in user changes", () => {
 
   add();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("");
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
   expect(createTask).toHaveBeenCalledExactlyOnceWith("bob", expect.any(String), "", "", "2026-11-04");
 });
 
 it("discards the draft and returns to the list when Cancel is pressed", () => {
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
-  const add = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  const add = () => [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
 
   add();
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
@@ -317,13 +321,13 @@ it("discards the draft and returns to the list when Cancel is pressed", () => {
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("");
 });
 
-it("creates an untitled task for today when Back is pressed on a fresh draft", () => {
+it("creates an untitled task for today when saving a fresh draft", () => {
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
   expect(createTask).not.toHaveBeenCalled();
 
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
   expect(createTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", "2026-11-04");
   expect(createRepeatingTask).not.toHaveBeenCalled();
 });
@@ -331,20 +335,20 @@ it("creates an untitled task for today when Back is pressed on a fresh draft", (
 it("accepts a date one year from today and rejects the following day", () => {
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
 
   const date = document.querySelector<HTMLInputElement>('[name="date"]')!;
-  const back = [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!;
+  const save = document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!;
   date.value = "2027-11-05";
   date.dispatchEvent(new Event("input", { bubbles: true }));
-  back.click();
+  save.click();
 
   expect(createTask).not.toHaveBeenCalled();
   expect(document.querySelector('[name="date"]')).toBe(date);
 
   date.value = "2027-11-04";
   date.dispatchEvent(new Event("input", { bubbles: true }));
-  back.click();
+  save.click();
 
   expect(createTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", "2027-11-04");
   expect(document.querySelector('[name="date"]')).toBeNull();
@@ -353,7 +357,7 @@ it("accepts a date one year from today and rejects the following day", () => {
 it("clamps a multi-day repeat interval to one when switched to Years", () => {
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
+  [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
   document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
 
   const interval = document.querySelector<HTMLInputElement>('[name="interval"]')!;
@@ -362,22 +366,22 @@ it("clamps a multi-day repeat interval to one when switched to Years", () => {
   const unit = document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!;
   unit.value = "Years";
   unit.dispatchEvent(new Event("change", { bubbles: true }));
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   expect(createRepeatingTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", {
     nextDate: "2026-11-04", anchorDate: "2026-11-04", interval: 1, intervalUnit: "Years",
   });
 });
 
-it.each([false, true])("creates the finished draft only on Back, with repeat=%s", (repeat) => {
+it.each([false, true])("creates the finished draft only on Save, with repeat=%s", (repeat) => {
   let receive!: (data: UserData) => void;
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     receive = onData;
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const add = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "＋ Task")!.click();
-  const back = () => [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  const add = () => [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
+  const save = () => document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   add();
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
@@ -395,7 +399,7 @@ it.each([false, true])("creates the finished draft only on Back, with repeat=%s"
   const interval = document.querySelector<HTMLInputElement>('[name="interval"]')!;
   interval.value = "0";
   interval.dispatchEvent(new Event("input", { bubbles: true }));
-  back();
+  save();
   expect(document.querySelector('[name="title"]')).toBe(title);
   if (repeat) {
     interval.value = "2";
@@ -408,7 +412,7 @@ it.each([false, true])("creates the finished draft only on Back, with repeat=%s"
   expect(createTask).not.toHaveBeenCalled();
   expect(createRepeatingTask).not.toHaveBeenCalled();
 
-  back();
+  save();
   if (repeat) {
     expect(createRepeatingTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "Laundry", "Wash the sheets", {
       nextDate: date, anchorDate: date, interval: 2, intervalUnit: "Days",
@@ -471,7 +475,7 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   const otherTitle = kind === "Task" ? "Repeating" : "Task";
   [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.querySelector("span:first-child")?.textContent === otherTitle)!.click();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe(kind === "Task" ? "Repeating" : "Task");
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   const title = kind === "Task" ? "Task" : "Repeating";
   [...document.querySelectorAll<HTMLButtonElement>("li button")].find((button) => button.querySelector("span:first-child")?.textContent === title)!.click();
@@ -516,7 +520,7 @@ it.each(["Schedule", "Open"])("sorts incomplete tasks and repeating occurrences 
   });
   dispose = render(() => <App />, document.body);
 
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = mode;
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -525,7 +529,7 @@ it.each(["Schedule", "Open"])("sorts incomplete tasks and repeating occurrences 
   expect(rows.slice(0, 3).map((row) => row.querySelector("time")!.getAttribute("datetime"))).toEqual([
     "2026-11-04", "2026-11-05", "2026-11-06",
   ]);
-  expect(rows[1]!.textContent).toContain("↻");
+  expect(rows[1]!.querySelector('[role="img"][aria-label="Repeating task"]')).not.toBeNull();
 
   if (mode === "Schedule") {
     expect(rows[3]?.querySelector("button > span:first-child")?.textContent).toBe("Weekly");
@@ -580,28 +584,30 @@ it("offers Search first while defaulting to Schedule, and clears the search phra
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   expect(select.value).toBe("Schedule");
   expect(select.options[0]!.value).toBe("Search");
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
-  const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
-  expect(document.querySelector('[aria-label="Clear search"]')).toBeNull();
+  const search = document.querySelector('[role="search"]')!;
+  const results = document.querySelector('ul[role="list"]')!;
+  const input = search.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  expect(search.querySelector('[aria-label="Clear search"]')).toBeNull();
   input.value = "missing";
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  expect(document.querySelectorAll("li")).toHaveLength(0);
-  document.querySelector<HTMLButtonElement>('[aria-label="Clear search"]')!.click();
+  expect(results.querySelectorAll("li")).toHaveLength(0);
+  search.querySelector<HTMLButtonElement>('[aria-label="Clear search"]')!.click();
   expect(input.value).toBe("");
   expect(document.activeElement).toBe(input);
-  expect(document.querySelectorAll("li")).toHaveLength(1);
-  expect(document.querySelector('[aria-label="Clear search"]')).toBeNull();
+  expect(results.querySelectorAll("li")).toHaveLength(1);
+  expect(search.querySelector('[aria-label="Clear search"]')).toBeNull();
 });
 
 
 it("clears the search phrase when switching list modes", () => {
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
@@ -625,7 +631,7 @@ it("keeps the search input focused while typing and preserves the phrase across 
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
@@ -638,9 +644,9 @@ it("keeps the search input focused while typing and preserves the phrase across 
     expect(select.value).toBe("Search");
   }
   document.querySelector<HTMLButtonElement>("li button")!.click();
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
   expect(document.querySelector<HTMLInputElement>('[aria-label="Search"]')!.value).toBe("Lau");
-  expect(document.querySelector("select")!.value).toBe("Search");
+  expect(document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!.value).toBe("Search");
 });
 
 it("updates search results from live data without resetting the phrase or focus", () => {
@@ -654,7 +660,7 @@ it("updates search results from live data without resetting the phrase or focus"
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
@@ -691,7 +697,7 @@ it("mixes search results by status and task date and opens each kind in its edit
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
@@ -715,7 +721,8 @@ it("mixes search results by status and task date and opens each kind in its edit
     expect(title.readOnly).toBe(expected.completed);
     expect(document.querySelector<HTMLTextAreaElement>('[name="details"]')!.value).toBe(expected.details);
     expect(document.querySelector('[name="intervalUnit"]') !== null).toBe(expected.repeating);
-    [...document.querySelectorAll("button")].find(button => button.textContent === "←")!.click();
+    const exitLabel = expected.completed ? "Back" : "Save";
+    document.querySelector<HTMLButtonElement>(`[aria-label="${exitLabel}"]`)!.click();
     expect(document.querySelector<HTMLInputElement>('[aria-label="Search"]')!.value).toBe("wash");
   }
 });
@@ -737,7 +744,7 @@ it("orders search matches by status, date, then title without relevance ranking"
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
@@ -764,7 +771,7 @@ it("finds detail-only matches in open, completed, and repeating tasks", () => {
     return vi.fn();
   });
   dispose = render(() => <App />, document.body);
-  const select = document.querySelector("select")!;
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
   select.value = "Search";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   const input = document.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
@@ -774,4 +781,26 @@ it("finds detail-only matches in open, completed, and repeating tasks", () => {
   expect([...document.querySelectorAll("li button > span:first-child")].map(row => row.textContent)).toEqual([
     "Groceries", "Subscription", "Shopping",
   ]);
+});
+
+it("names the sign out button and uses the placeholder when there is no profile photo", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+
+  const photo = document.querySelector('button[aria-label="Sign out"] img');
+  expect(photo?.getAttribute("src")).toBe("/assets/profile-placeholder.svg");
+  expect(photo?.getAttribute("alt")).toBe("");
+});
+
+it("shows a missing-date alert and prevents saving", () => {
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+  [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
+  const date = document.querySelector<HTMLInputElement>('[name="date"]')!;
+  date.value = "";
+  date.dispatchEvent(new Event("input", { bubbles: true }));
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
+
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe("A date is required.");
+  expect(createTask).not.toHaveBeenCalled();
 });

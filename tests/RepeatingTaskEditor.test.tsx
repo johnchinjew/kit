@@ -69,7 +69,9 @@ it("edits a repeating task without offering task completion or conversion", () =
     onBack={onBack}
   />, document.body);
 
-  expect([...document.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["←", "Delete"]);
+  const buttons = [...document.querySelectorAll("button")];
+  const buttonName = (button: HTMLButtonElement) => button.getAttribute("aria-label") ?? button.textContent;
+  expect(buttons.map(buttonName)).toEqual(["Save", "Delete"]);
   const date = document.querySelector<HTMLInputElement>('[name="nextDate"]')!;
   date.value = "2026-02-28";
   date.dispatchEvent(new Event("input", { bubbles: true }));
@@ -80,7 +82,7 @@ it("edits a repeating task without offering task completion or conversion", () =
   interval.value = "2";
   interval.dispatchEvent(new InputEvent("input", { bubbles: true }));
   expect(date.value).toBe("2026-02-28");
-  document.querySelector<HTMLButtonElement>("button")!.click();
+  buttons.find((button) => buttonName(button) === "Save")!.click();
 
   expect(setRepeatingTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "rent", {
     nextDate: "2026-02-28", interval: 2, intervalUnit: "Weeks", anchorDate: "2026-02-28",
@@ -109,7 +111,7 @@ it("preserves the monthly anchor when only the interval changes", () => {
   const interval = document.querySelector<HTMLInputElement>('[name="interval"]')!;
   interval.value = "2";
   interval.dispatchEvent(new InputEvent("input", { bubbles: true }));
-  document.querySelector<HTMLButtonElement>("button")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   expect(setRepeatingTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "rent", {
     nextDate: "2026-02-28", interval: 2, intervalUnit: "Months", anchorDate: "2026-01-31",
@@ -136,7 +138,7 @@ it.each([2, 30])("keeps interval %s within the maximum when changing units", (in
   intervalUnit.dispatchEvent(new Event("change", { bubbles: true }));
   const expectedInterval = initialInterval === 2 ? 2 : 12;
   expect(document.querySelector<HTMLInputElement>('[name="interval"]')!.value).toBe(String(expectedInterval));
-  document.querySelector<HTMLButtonElement>("button")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   expect(setRepeatingTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "rent", {
     nextDate: "2026-02-28", interval: expectedInterval, intervalUnit: "Months", anchorDate: "2026-02-28",
@@ -163,7 +165,7 @@ it.each(["nextDate", "interval"])("rejects a cleared %s", (field) => {
   const input = document.querySelector<HTMLInputElement>(`[name="${field}"]`)!;
   input.value = "";
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  document.querySelector<HTMLButtonElement>("button")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   expect(setRepeatingTaskSchedule).not.toHaveBeenCalled();
   expect(onBack).not.toHaveBeenCalled();
@@ -208,7 +210,7 @@ it.each(["edited", "unchanged", "reverted"])("saves only an edited schedule afte
   expect(document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!.value).toBe("Months");
   expect(interval.value).toBe(state === "edited" ? "2" : "1");
   expect(interval.max).toBe("12");
-  document.querySelector<HTMLButtonElement>("button")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   if (state === "edited") {
     expect(setRepeatingTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "rent", {
@@ -248,7 +250,7 @@ it.each([
   const intervalUnit = document.querySelector<HTMLSelectElement>('[name="intervalUnit"]')!;
   intervalUnit.value = to;
   intervalUnit.dispatchEvent(new Event("change", { bubbles: true }));
-  document.querySelector<HTMLButtonElement>("button")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   expect(setRepeatingTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "walk", {
     nextDate, interval: 1, intervalUnit: to, anchorDate: nextDate,
@@ -257,7 +259,7 @@ it.each([
   expect(nextOccurrenceDate(saved)).toBe(followingDate);
 });
 
-it("trims title and details when clicking Back", () => {
+it("trims title and details when saving", () => {
   dispose = render(() => <RepeatingTaskEditor
       repeatingTaskId="first"
       repeatingTask={{ title: "Original", details: "Original", schedule: {
@@ -273,7 +275,7 @@ it("trims title and details when clicking Back", () => {
   details.value = " \n  Whole grain\nTwo loaves  \n ";
   details.dispatchEvent(new Event("input", { bubbles: true }));
   expect(title.value).toBe("  Buy  bread  ");
-  [...document.querySelectorAll("button")].find((button) => button.textContent === "←")!.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
 
   expect(setRepeatingTaskTitle).toHaveBeenCalledExactlyOnceWith("alice", "first", "Buy  bread");
   expect(setRepeatingTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Whole grain\nTwo loaves");

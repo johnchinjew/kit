@@ -59,7 +59,7 @@ export default function App() {
 function AppLoading() {
   return (
     <main class="p-4 mx-auto w-full max-w-lg">
-      <p class="px-4 py-2.5 text-center">Loading...</p>
+      <p role="status" class="px-4 py-2.5 text-center">Loading...</p>
     </main>
   );
 }
@@ -149,7 +149,7 @@ function AppSignedIn(props: {
             );
           case "TaskEditor":
             return (
-              <Show when={userData().tasks[current.taskId]} fallback={<p>Loading...</p>}>
+              <Show when={userData().tasks[current.taskId]} fallback={<AppLoading />}>
                 {(task) => (
                   <TaskEditor
                     taskId={current.taskId}
@@ -163,7 +163,7 @@ function AppSignedIn(props: {
             );
           case "RepeatingTaskEditor":
             return (
-              <Show when={userData().repeatingTasks[current.repeatingTaskId]} fallback={<p>Loading...</p>}>
+              <Show when={userData().repeatingTasks[current.repeatingTaskId]} fallback={<AppLoading />}>
                 {(repeatingTask) => (
                   <RepeatingTaskEditor
                     repeatingTaskId={current.repeatingTaskId}
@@ -214,10 +214,12 @@ function List(props: {
           )}
         </Match>
         <Match when={listModeType() === "Schedule"}>
+          {/* Keep ActionBar first to ensure TAB reaches the ActionBar before any list rows. */}
           <ActionBar openTaskCreator={props.openTaskCreator} />
           <ScheduleList userData={props.userData} setView={props.setView} />
         </Match>
         <Match when={listModeType() === "Open"}>
+          {/* Keep ActionBar first to ensure TAB reaches the ActionBar before any list rows. */}
           <ActionBar openTaskCreator={props.openTaskCreator} />
           <OpenList userData={props.userData} setView={props.setView} />
         </Match>
@@ -278,6 +280,7 @@ function ListModeSelector(props: {
 }) {
   return (
     <select
+      aria-label="List selector"
       class="font-semibold"
       value={props.listMode}
       onChange={(event) => {
@@ -303,14 +306,16 @@ function SignOutButton(props: { photoUrl: string | null; signOut: () => void; })
       type="button"
       class="block size-8 rounded-full cursor-pointer"
       title="Sign out"
+      aria-label="Sign out"
       onClick={() => {
         if (window.confirm("Sign out?")) props.signOut();
       }}
     >
+      {/* Use alt="" to mark the img as decorative (the button already has title and aria-label). */}
       <img
         class="size-full rounded-full object-cover"
         src={props.photoUrl ?? "/assets/profile-placeholder.svg"}
-        alt="Profile photo"
+        alt=""
       />
     </button>
   );
@@ -321,7 +326,7 @@ function ActionBar(props: {
 }) {
   return (
     <div class="order-last isolate sticky bottom-0 mt-auto mx-auto flex justify-center w-full max-w-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] before:content-[''] before:absolute before:inset-0 before:-top-8 before:-z-10 before:pointer-events-none before:bg-background before:[mask-image:linear-gradient(to_bottom,transparent,rgb(0_0_0_/_70%)_1.5rem,rgb(0_0_0_/_90%)_2.25rem,black_3rem)]">
-      <TextButton onClick={props.openTaskCreator}>＋ Task</TextButton>
+      <TextButton onClick={props.openTaskCreator}>＋ Add task</TextButton>
     </div>
   );
 }
@@ -341,7 +346,7 @@ function SearchList(props: {
 
   return (
     <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
-      <div class="relative mb-4">
+      <div role="search" class="relative mb-4">
         <input
           ref={input}
           type="text"
@@ -365,7 +370,7 @@ function SearchList(props: {
           </button>
         </Show>
       </div>
-      <ul class="divide-y divide-border px-4">
+      <ul role="list" class="divide-y divide-border px-4">
         <For each={searchRows(props.userData, props.phrase)}>
           {(row) => {
             switch (row.type) {
@@ -443,7 +448,7 @@ function ScheduleList(props: {
 }) {
   return (
     <main class="px-4 mx-auto w-full max-w-lg">
-      <ul class="divide-y divide-border px-4">
+      <ul role="list" class="divide-y divide-border px-4">
         <For each={scheduleRows(props.userData)}>
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
@@ -497,7 +502,7 @@ function OpenList(props: {
 }) {
   return (
     <main class="px-4 mx-auto w-full max-w-lg">
-      <ul class="divide-y divide-border px-4">
+      <ul role="list" class="divide-y divide-border px-4">
         <For each={openRows(props.userData)}>
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
@@ -553,7 +558,7 @@ function CompletedList(props: {
   return (
     <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
       <p class="px-4 pb-4 text-center text-sm text-foreground-muted">Tasks are automatically deleted one year after completion.</p>
-      <ul class="divide-y divide-border px-4">
+      <ul role="list" class="divide-y divide-border px-4">
         <For each={completedRows(props.userData)}>
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
@@ -619,7 +624,7 @@ function RepeatingTaskRow(props: {
         {props.title || "Empty title"}
       </span>
       <span class="text-foreground-muted">
-        ↻ <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+        <span role="img" aria-label="Repeating task">↻</span> <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
       </span>
       <Show when={props.details}>
         <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>

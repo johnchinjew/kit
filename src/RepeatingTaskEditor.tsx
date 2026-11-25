@@ -3,6 +3,7 @@ import Fieldset from "./components/Fieldset";
 import Input from "./components/Input";
 import Select from "./components/Select";
 import TextArea from "./components/TextArea";
+import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
 import { createSignal, type JSX } from "solid-js";
 import { maxInterval, type IntervalUnit, type RepeatingTask, type Schedule } from "./repeatingTask";
@@ -156,9 +157,7 @@ export default function RepeatingTaskEditor(props: {
   return (
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="justify-self-start">
-        <TextButton onClick={onClickBack}>
-          ←
-        </TextButton>
+        <IconButton aria-label="Save" onClick={onClickBack}>←</IconButton>
       </div>
       <Field label="Title">
         <Input

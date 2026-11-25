@@ -4,6 +4,7 @@ import Input from "./components/Input";
 import Select from "./components/Select";
 import TextArea from "./components/TextArea";
 import { createSignal, Show } from "solid-js";
+import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
 import { maxInterval, type IntervalUnit } from "./repeatingTask";
 import type { SignedIn } from "./session";
@@ -60,7 +61,7 @@ export default function TaskCreator(props: {
   return (
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="flex justify-between">
-        <TextButton onClick={onClickBack}>←</TextButton>
+        <IconButton aria-label="Save" onClick={onClickBack}>←</IconButton>
         <TextButton danger onClick={props.onBack}>Cancel</TextButton>
       </div>
       <Field label="Title">
