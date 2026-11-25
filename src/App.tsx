@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import { createEffect, createSignal, For, Match, onCleanup, onMount, Show, Switch, untrack } from "solid-js";
 import TaskCreator from "./TaskCreator";
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
@@ -204,24 +204,59 @@ function MenuBar(props: {
   signOut: () => void;
   setListMode: (mode: ListMode) => void;
 }) {
+  const [showStickyMenuBar, setShowStickyMenuBar] = createSignal(false);
+  let header!: HTMLElement;
+
+  onMount(() => {
+    if (typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry) {
+        setShowStickyMenuBar(!entry.isIntersecting && entry.boundingClientRect.bottom <= 0);
+      }
+    });
+
+    observer.observe(header);
+    onCleanup(() => observer.disconnect());
+  });
+
   return (
-    <header class="p-4 grid grid-cols-[1fr_auto_1fr] items-center">
-      <select
-        class="col-start-2"
-        value={props.listMode}
-        onChange={(event) => {
-          const mode = event.currentTarget.value;
-          if (mode === "Schedule" || mode === "Open" || mode === "Completed") props.setListMode(mode);
-        }}
-      >
-        <option value="Schedule">Schedule</option>
-        <option value="Open">Open</option>
-        <option value="Completed">Completed</option>
-      </select>
-      <div class="col-start-3 justify-self-end">
-        <SignOutButton photoUrl={props.photoUrl} signOut={props.signOut} />
-      </div>
-    </header>
+    <>
+      <header ref={header} class="p-4 grid grid-cols-[1fr_auto_1fr] items-center">
+        <div class="col-start-2">
+          <ListModeSelector listMode={props.listMode} setListMode={props.setListMode} />
+        </div>
+        <div class="col-start-3 justify-self-end">
+          <SignOutButton photoUrl={props.photoUrl} signOut={props.signOut} />
+        </div>
+      </header>
+      <Show when={showStickyMenuBar()}>
+        <div class="fixed inset-x-0 top-0 z-10 flex justify-center border-b border-border bg-background px-4 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))]">
+          <ListModeSelector listMode={props.listMode} setListMode={props.setListMode} />
+        </div>
+      </Show>
+    </>
+  );
+}
+
+function ListModeSelector(props: {
+  listMode: ListMode;
+  setListMode: (mode: ListMode) => void;
+}) {
+  return (
+    <select
+      value={props.listMode}
+      onChange={(event) => {
+        const mode = event.currentTarget.value;
+        if (mode === "Schedule" || mode === "Open" || mode === "Completed") props.setListMode(mode);
+      }}
+    >
+      <option value="Schedule">Schedule</option>
+      <option value="Open">Open</option>
+      <option value="Completed">Completed</option>
+    </select>
   );
 }
 

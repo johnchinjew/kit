@@ -36,6 +36,10 @@ let dispose: (() => void) | undefined;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubGlobal("IntersectionObserver", vi.fn(class {
+    observe = vi.fn();
+    disconnect = vi.fn();
+  }));
   vi.setSystemTime(new Date(2026, 10, 4, 12));
   vi.mocked(deleteTasksWithElapsedRetention).mockResolvedValue(undefined);
   vi.mocked(createTask).mockResolvedValue(undefined);
@@ -47,7 +51,60 @@ afterEach(() => {
   dispose?.();
   dispose = undefined;
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+it("shows a synchronized list selector after the header scrolls away and hides it at the top", () => {
+  let onIntersection!: IntersectionObserverCallback;
+  const observe = vi.fn();
+  const disconnect = vi.fn();
+  vi.stubGlobal("IntersectionObserver", vi.fn(class {
+    constructor(callback: IntersectionObserverCallback) { onIntersection = callback; }
+    observe = observe;
+    disconnect = disconnect;
+  }));
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+
+  const header = document.querySelector("header")!;
+  const original = header.querySelector("select")!;
+  const observer = vi.mocked(IntersectionObserver).mock.instances[0]!;
+  expect(observe).toHaveBeenCalledWith(header);
+  expect(document.querySelectorAll("select")).toHaveLength(1);
+
+  onIntersection([{ isIntersecting: false, boundingClientRect: { bottom: -1 } } as IntersectionObserverEntry], observer);
+
+  const sticky = document.querySelectorAll("select")[1]!;
+  expect(sticky.value).toBe("Schedule");
+  expect(sticky.parentElement!.querySelectorAll("button")).toHaveLength(0);
+  sticky.value = "Completed";
+  sticky.dispatchEvent(new Event("change", { bubbles: true }));
+  expect(original.value).toBe("Completed");
+  expect(document.querySelector("main")!.textContent).toContain("Completed tasks are automatically deleted");
+
+  onIntersection([{ isIntersecting: true, boundingClientRect: { bottom: 64 } } as IntersectionObserverEntry], observer);
+  expect(document.querySelectorAll("select")).toHaveLength(1);
+  expect(original.value).toBe("Completed");
+
+  onIntersection([{ isIntersecting: false, boundingClientRect: { bottom: -1 } } as IntersectionObserverEntry], observer);
+  expect(document.querySelectorAll("select")[1]!.value).toBe("Completed");
+  dispose!();
+  dispose = undefined;
+  expect(disconnect).toHaveBeenCalledOnce();
+});
+
+it("keeps list switching usable without IntersectionObserver", () => {
+  vi.stubGlobal("IntersectionObserver", undefined);
+  vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
+  dispose = render(() => <App />, document.body);
+
+  expect(document.querySelectorAll("select")).toHaveLength(1);
+  const select = document.querySelector("header select") as HTMLSelectElement;
+  select.value = "Completed";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  expect(document.querySelector("main")!.textContent).toContain("Completed tasks are automatically deleted");
 });
 
 it("only shows the pre-alpha notice on the sign-in screen", () => {
