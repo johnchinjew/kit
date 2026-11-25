@@ -247,6 +247,7 @@ function ListModeSelector(props: {
 }) {
   return (
     <select
+      class="font-semibold"
       value={props.listMode}
       onChange={(event) => {
         const mode = event.currentTarget.value;
@@ -451,7 +452,7 @@ function TaskRow(props: {
       <span class="truncate" classList={{ "text-foreground-muted": !props.title }}>
         {props.title || "Empty title"}
       </span>
-      <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+      <time class="text-foreground-muted" dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
       <Show when={props.details}>
         <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
       </Show>
@@ -474,7 +475,7 @@ function RepeatingTaskRow(props: {
       <span class="truncate" classList={{ "text-foreground-muted": !props.title }}>
         {props.title || "Empty title"}
       </span>
-      <span>
+      <span class="text-foreground-muted">
         ↻ <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
       </span>
       <Show when={props.details}>
