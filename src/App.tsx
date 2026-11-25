@@ -230,7 +230,10 @@ function SignOutButton(props: { photoUrl: string | null; signOut: () => void; })
     <button
       type="button"
       class="block size-8 rounded-full cursor-pointer"
-      onClick={props.signOut}
+      title="Sign out"
+      onClick={() => {
+        if (window.confirm("Sign out?")) props.signOut();
+      }}
     >
       <img
         class="size-full rounded-full object-cover"
