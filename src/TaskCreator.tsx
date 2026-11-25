@@ -61,7 +61,7 @@ export default function TaskCreator(props: {
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="flex justify-between">
         <TextButton onClick={onClickBack}>←</TextButton>
-        <TextButton onClick={props.onBack}>Cancel</TextButton>
+        <TextButton danger onClick={props.onBack}>Cancel</TextButton>
       </div>
       <Field label="Title">
         <Input

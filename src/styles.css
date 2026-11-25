@@ -7,6 +7,7 @@
   --color-background: var(--app-color-background);
   --color-foreground: var(--app-color-foreground);
   --color-foreground-muted: var(--app-color-foreground-muted);
+  --color-danger: var(--app-color-danger);
   --color-border: var(--app-color-border);
 
   --font-sans: ui-sans-serif, system-ui, sans-serif;
@@ -41,6 +42,7 @@
     --app-color-background: #ffffff;
     --app-color-foreground: #5e5e5e;
     --app-color-foreground-muted: #a5a5a5;
+    --app-color-danger: #a42219;
     --app-color-border: #e8e8e8;
     --app-shadow-lg:
       0 20px 40px -24px rgb(0 0 0 / 0.28),
@@ -58,6 +60,7 @@
       --app-color-background: #232527;
       --app-color-foreground: #c3c5c7;
       --app-color-foreground-muted: #737577;
+      --app-color-danger: #ff7b70;
       --app-color-border: #333537;
       --app-shadow-lg:
         0 20px 40px -24px rgb(0 0 0 / 0.55),

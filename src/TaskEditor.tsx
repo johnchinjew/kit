@@ -169,7 +169,7 @@ export default function TaskEditor(props: {
         />
       </Field>
       <div class="justify-self-end">
-        <TextButton onClick={onClickDelete}>
+        <TextButton danger onClick={onClickDelete}>
           Delete
         </TextButton>
       </div>
