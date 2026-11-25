@@ -408,7 +408,7 @@ function CompletedList(props: {
 }) {
   return (
     <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
-      <p class="px-4 pb-4 text-center text-sm text-foreground-muted">Completed tasks are automatically deleted 1 year after their completion date.</p>
+      <p class="px-4 pb-4 text-center text-sm text-foreground-muted">Tasks are automatically deleted one year after completion.</p>
       <ul class="divide-y divide-border px-4">
         <For each={completedRows(props.userData)}>
           {(row) => (

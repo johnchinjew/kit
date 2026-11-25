@@ -81,7 +81,7 @@ it("shows a synchronized list selector after the header scrolls away and hides i
   sticky.value = "Completed";
   sticky.dispatchEvent(new Event("change", { bubbles: true }));
   expect(original.value).toBe("Completed");
-  expect(document.querySelector("main")!.textContent).toContain("Completed tasks are automatically deleted");
+  expect(document.querySelector("main")!.textContent).toContain("Tasks are automatically deleted one year after completion.");
 
   onIntersection([{ isIntersecting: true, boundingClientRect: { bottom: 64 } } as IntersectionObserverEntry], observer);
   expect(document.querySelectorAll("select")).toHaveLength(1);
@@ -104,7 +104,7 @@ it("keeps list switching usable without IntersectionObserver", () => {
   select.value = "Completed";
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
-  expect(document.querySelector("main")!.textContent).toContain("Completed tasks are automatically deleted");
+  expect(document.querySelector("main")!.textContent).toContain("Tasks are automatically deleted one year after completion.");
 });
 
 it("only shows the pre-alpha notice on the sign-in screen", () => {
