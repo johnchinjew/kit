@@ -2,18 +2,19 @@
 
 Just a to-do list.
 
-## Features
+## Development
 
-- Schedule list: all incomplete tasks and 1 year of occurrences for all repeating tasks, ordered by date.
-- Open list: all incomplete tasks, ordered by date. Each repeating task appears only once on its next occurrence date.
-- Completed list: all completed tasks, ordered by completion date. Tasks are deleted 400 days after completion.
-- Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task is fully
-  independent of that repeating task. Every task must have a date (up to 1 year away).
-- Repeating task: title, details, next occurrence date, and repetition interval (up to 1 year away). Cannot be
-  completed. Can be deleted. Open any occurrence to edit the same repeating task. Every occurrence dated today or
-  earlier becomes a separate incomplete task.
-- Persistence: Changes are synced in real time across devices. Offline changes are saved and synced when online.
-  Concurrent changes are merged whenever possible. Conflicting edits use chronological last-edit-wins.
+```
+npm install
+npm run dev
+```
+
+Reminders
+
+- Always run `npm run check` to verify changes.
+- Schema and security rule changes must remain compatible with older clients and queued offline writes.
+- When changing domain, logo, privacy policy URL, or other branding details, remember to update
+  [Google OAuth branding](https://console.cloud.google.com/auth/branding?project=kit-tasks) accordingly.
 
 ## Architecture
 
@@ -25,9 +26,24 @@ Client -> Cloudflare -> Firebase Hosting
    +----> Firestore
 ```
 
+Supported feature set:
+
+- Schedule list: all incomplete tasks and 1 year of occurrences for all repeating tasks, ordered by date.
+- Open list: all incomplete tasks, ordered by date. Each repeating task appears only once on its next occurrence date.
+- Completed list: all completed tasks, ordered by completion date. Tasks are deleted 400 days after completion.
+- Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task is fully
+  independent of that repeating task. Every task must have a date (up to 1 year away).
+- Repeating task: title, details, next occurrence date, and repetition interval (up to 1 year away). Cannot be
+  completed. Can be deleted. Open any occurrence to edit the same repeating task. Every occurrence dated today or
+  earlier becomes a separate incomplete task.
+- Persistence: Changes are synced in real time across devices. Offline changes are saved and synced when online.
+  Non-conflicting mutations are combined whenever possible. Conflicting mutations use chronological last-edit-wins.
+
+Key decisions:
+
 - A single Firestore document per user to keep things economical.
 - Clients stay subscribed to the document to receive updates from other devices in real time.
-- Model writes as separate operations per conflict domain: create task, set task title, etc.
+- Writes are modeled as separate operations per conflict domain: create task, set task title, etc.
 - Resources such as tasks have a UUID to avoid concurrent creation collisions.
 - Resources such as task titles need an edit timestamp to enable chronological last-edit-wins.
 - Use Firestore Security Rules to ensure edits for resources such as task titles are only accepted if the incoming
@@ -43,25 +59,3 @@ Client -> Cloudflare -> Firebase Hosting
   wait as long as practical, then migrate existing data and begin enforcing the new invariant. Breaking changes carry
   unavoidable risks: queued writes may be rejected, old clients may stop working correctly, old clients may reintroduce
   legacy data that conflicts with the new model, etc.
-
-## Development
-
-When changing domain, logo, privacy policy URL, or other branding details, remember to update
-[Google OAuth branding](https://console.cloud.google.com/auth/branding?project=kit-tasks) accordingly.
-
-## Known Issues
-
-- Date labels can remain stale when the app stays open across midnight.
-- Repeating occurrences become tasks only on the first data snapshot, so midnight rollover, newly created schedules, and
-  later synced schedules can require reopening the app.
-- Multiple devices processing the same repeating occurrence can create duplicate tasks. For example, an offline app may
-  create tasks that have already been created earlier because it has outdated data.
-- Recurrence generation uses each device's local date. A device already on tomorrow can generate an occurrence before
-  another device reaches that day.
-- Creating an occurrence task and advancing its schedule are separate writes, so partial failures can leave tasks
-  created without advancing the schedule.
-- Editor changes are lost if the app closes or reloads before the user presses Back or Complete.
-- Failed saves show an error after closing the editor, without preserving the draft for recovery.
-- Firestore rules validate selected timestamps but do not restrict writes to the intended fields or validate the schema
-  of incoming data.
-- There is no recovery strategy for hitting the Firestore document size limit.
