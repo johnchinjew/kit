@@ -310,6 +310,7 @@ it("discards the draft and returns to the list when Cancel is pressed", () => {
 
   add();
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  expect(document.activeElement).toBe(title);
   title.value = "Discard this task";
   title.dispatchEvent(new Event("input", { bubbles: true }));
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Cancel")!.click();

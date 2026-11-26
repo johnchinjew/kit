@@ -3,7 +3,7 @@ import Fieldset from "./components/Fieldset";
 import Input from "./components/Input";
 import Select from "./components/Select";
 import TextArea from "./components/TextArea";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
 import { maxInterval, type IntervalUnit } from "./repeatingTask";
@@ -22,6 +22,9 @@ export default function TaskCreator(props: {
   const [date, setDate] = createSignal<string>(taskDateToday());
   const [interval, setInterval] = createSignal(1);
   const [intervalUnit, setIntervalUnit] = createSignal<IntervalUnit>("Days");
+  let titleInput!: HTMLInputElement;
+
+  onMount(() => titleInput.focus());
 
   function changeIntervalUnit(unit: IntervalUnit) {
     setIntervalUnit(unit);
@@ -66,6 +69,7 @@ export default function TaskCreator(props: {
       </div>
       <Field label="Title">
         <Input
+          ref={(element) => { titleInput = element; }}
           name="title"
           type="text"
           value={title()}
