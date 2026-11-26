@@ -598,6 +598,7 @@ it("offers Search first while defaulting to Schedule, and clears the search phra
   const search = document.querySelector('[role="search"]')!;
   const results = document.querySelector('ul[role="list"]')!;
   const input = search.querySelector<HTMLInputElement>('[aria-label="Search"]')!;
+  expect(document.activeElement).toBe(input);
   expect(search.querySelector('[aria-label="Clear search"]')).toBeNull();
   input.value = "missing";
   input.dispatchEvent(new Event("input", { bubbles: true }));

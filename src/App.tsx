@@ -344,6 +344,8 @@ function SearchList(props: {
 }) {
   let input!: HTMLInputElement;
 
+  onMount(() => input.focus());
+
   return (
     <main class="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] mx-auto w-full max-w-lg">
       <div role="search" class="relative mb-4">
