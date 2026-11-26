@@ -433,10 +433,20 @@ function searchRows(data: UserData, phrase: string): SearchRow[] {
     }));
   return [...taskRows, ...repeatingTaskRows]
     .filter((row) => containsSearchPhrase(row.title, phrase) || containsSearchPhrase(row.details, phrase))
+    // Show all open tasks before all completed tasks.
+    // Within each status, order tasks by date.
+    // Within each date, show non-repeating tasks before repeating tasks.
+    // Within each task type, order tasks by title alphabetically.
     .sort((left, right) => {
-      if (left.type === "CompletedTask" && right.type !== "CompletedTask") return 1;
-      if (left.type !== "CompletedTask" && right.type === "CompletedTask") return -1;
-      return left.date.localeCompare(right.date) || left.title.localeCompare(right.title);
+      if (left.type === "CompletedTask") {
+        if (right.type !== "CompletedTask") return 1;
+        return left.date.localeCompare(right.date) || left.title.localeCompare(right.title);
+      }
+      if (right.type === "CompletedTask") return -1;
+      const dateOrder = left.date.localeCompare(right.date);
+      if (dateOrder !== 0) return dateOrder;
+      if (left.type !== right.type) return left.type === "Task" ? -1 : 1;
+      return left.title.localeCompare(right.title);
     });
 }
 
@@ -489,9 +499,15 @@ function scheduleRows(data: UserData): ScheduleRow[] {
       occurrenceDates(repeatingTask.schedule, taskDateOneYearFromToday())
         .map((date) => ({ type: "RepeatingTask", repeatingTaskId, title: repeatingTask.title, details: repeatingTask.details, date }))
     );
-  return [...taskRows, ...repeatingTaskRows].sort((left, right) =>
-    left.date.localeCompare(right.date) || left.title.localeCompare(right.title)
-  );
+  // Order tasks by date.
+  // Within each date, show non-repeating tasks before repeating tasks.
+  // Within each task type, order tasks by title alphabetically.
+  return [...taskRows, ...repeatingTaskRows].sort((left, right) => {
+    const dateOrder = left.date.localeCompare(right.date);
+    if (dateOrder !== 0) return dateOrder;
+    if (left.type !== right.type) return left.type === "Task" ? -1 : 1;
+    return left.title.localeCompare(right.title);
+  });
 }
 
 type OpenRow =
@@ -546,9 +562,15 @@ function openRows(data: UserData): OpenRow[] {
       details: repeatingTask.details,
       date: repeatingTask.schedule.nextDate,
     }));
-  return [...taskRows, ...repeatingTaskRows].sort((left, right) =>
-    left.date.localeCompare(right.date) || left.title.localeCompare(right.title)
-  );
+  // Order tasks by date.
+  // Within each date, show non-repeating tasks before repeating tasks.
+  // Within each task type, order tasks by title alphabetically.
+  return [...taskRows, ...repeatingTaskRows].sort((left, right) => {
+    const dateOrder = left.date.localeCompare(right.date);
+    if (dateOrder !== 0) return dateOrder;
+    if (left.type !== right.type) return left.type === "Task" ? -1 : 1;
+    return left.title.localeCompare(right.title);
+  });
 }
 
 type CompletedRow = { taskId: string; title: string; completedAt: Timestamp; };
@@ -578,6 +600,7 @@ function CompletedList(props: {
 }
 
 function completedRows(data: UserData): CompletedRow[] {
+  // Order tasks by completion time, most recently completed first.
   return Object.entries(data.tasks)
     .flatMap(([taskId, task]) =>
       task.completedAt === null

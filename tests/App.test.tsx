@@ -502,13 +502,14 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   expect(subscribeUserData).toHaveBeenCalledTimes(1);
 });
 
-it.each(["Schedule", "Open"])("sorts incomplete tasks and repeating occurrences together in %s", (mode) => {
+it.each(["Schedule", "Open"])("sorts normal tasks before repeating occurrences on the same day in %s", (mode) => {
   const completedAt = Timestamp.fromDate(new Date("2026-11-03T12:00:00Z"));
   const data: UserData = {
     tasks: {
       later: { title: "Later", details: "", date: decodeTaskDate("2026-11-06"), completedAt: null },
       done: { title: "Done", details: "", date: decodeTaskDate("2026-11-01"), completedAt },
       earlier: { title: "Earlier", details: "", date: decodeTaskDate("2026-11-04"), completedAt: null },
+      sameDay: { title: "Zebra", details: "", date: decodeTaskDate("2026-11-05"), completedAt: null },
     },
     repeatingTasks: {
       weekly: {
@@ -531,17 +532,17 @@ it.each(["Schedule", "Open"])("sorts incomplete tasks and repeating occurrences 
   select.dispatchEvent(new Event("change", { bubbles: true }));
 
   const rows = [...document.querySelectorAll("li")];
-  expect(rows.slice(0, 3).map((row) => row.querySelector("button > span:first-child")!.textContent)).toEqual(["Earlier", "Weekly", "Later"]);
-  expect(rows.slice(0, 3).map((row) => row.querySelector("time")!.getAttribute("datetime"))).toEqual([
-    "2026-11-04", "2026-11-05", "2026-11-06",
+  expect(rows.slice(0, 4).map((row) => row.querySelector("button > span:first-child")!.textContent)).toEqual(["Earlier", "Zebra", "Weekly", "Later"]);
+  expect(rows.slice(0, 4).map((row) => row.querySelector("time")!.getAttribute("datetime"))).toEqual([
+    "2026-11-04", "2026-11-05", "2026-11-05", "2026-11-06",
   ]);
-  expect(rows[1]!.querySelector('[role="img"][aria-label="Repeating task"]')).not.toBeNull();
+  expect(rows[2]!.querySelector('[role="img"][aria-label="Repeating task"]')).not.toBeNull();
 
   if (mode === "Schedule") {
-    expect(rows[3]?.querySelector("button > span:first-child")?.textContent).toBe("Weekly");
-    expect(rows[3]?.querySelector("time")?.getAttribute("datetime")).toBe("2026-11-12");
+    expect(rows[4]?.querySelector("button > span:first-child")?.textContent).toBe("Weekly");
+    expect(rows[4]?.querySelector("time")?.getAttribute("datetime")).toBe("2026-11-12");
   } else {
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
   }
 });
 
@@ -694,11 +695,12 @@ it("mixes search results by status and task date and opens each kind in its edit
   vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
     onData({ tasks: {
       open: { title: "Wash towels", details: "Open details", date, completedAt: null },
+      later: { title: "Wash aprons", details: "Later open details", date: decodeTaskDate("2026-11-05"), completedAt: null },
       doneLater: { title: "Wash blankets", details: "Later details", date: decodeTaskDate("2026-11-02"), completedAt: Timestamp.fromDate(new Date("2026-11-03T12:00:00Z")) },
       doneEarlier: { title: "Wash sheets", details: "Earlier details", date: decodeTaskDate("2026-11-01"), completedAt: Timestamp.fromDate(new Date("2026-11-02T12:00:00Z")) },
     }, repeatingTasks: {
       repeat: { title: "Wash clothes", details: "Repeating details", schedule: {
-        nextDate: decodeTaskDate("2026-11-05"), anchorDate: date, interval: 1, intervalUnit: "Days",
+        nextDate: date, anchorDate: date, interval: 1, intervalUnit: "Days",
       }, scheduleEditedAt: Timestamp.now() },
     } });
     return vi.fn();
@@ -712,13 +714,14 @@ it("mixes search results by status and task date and opens each kind in its edit
   input.dispatchEvent(new Event("input", { bubbles: true }));
 
   expect([...document.querySelectorAll("li button > span:first-child")].map(row => row.textContent)).toEqual([
-    "Wash towels", "Wash clothes", "Wash sheets", "Wash blankets",
+    "Wash towels", "Wash clothes", "Wash aprons", "Wash sheets", "Wash blankets",
   ]);
   expect(document.querySelectorAll("li .line-through")).toHaveLength(2);
 
   for (const expected of [
     { title: "Wash towels", details: "Open details", repeating: false, completed: false },
     { title: "Wash clothes", details: "Repeating details", repeating: true, completed: false },
+    { title: "Wash aprons", details: "Later open details", repeating: false, completed: false },
     { title: "Wash sheets", details: "Earlier details", repeating: false, completed: true },
     { title: "Wash blankets", details: "Later details", repeating: false, completed: true },
   ]) {
