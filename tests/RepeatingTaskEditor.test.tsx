@@ -53,7 +53,7 @@ it.each([true, false])("deletes a repeating task only when confirmation is accep
   }
 });
 
-it("edits a repeating task without offering task completion or conversion", () => {
+it.each(["Save", "Cmd+Enter", "Ctrl+Enter"])("edits a repeating task with %s without offering task completion or conversion", (action) => {
   const onBack = vi.fn();
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
@@ -82,7 +82,11 @@ it("edits a repeating task without offering task completion or conversion", () =
   interval.value = "2";
   interval.dispatchEvent(new InputEvent("input", { bubbles: true }));
   expect(date.value).toBe("2026-02-28");
-  buttons.find((button) => buttonName(button) === "Save")!.click();
+  if (action === "Cmd+Enter" || action === "Ctrl+Enter") {
+    interval.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: action === "Cmd+Enter", ctrlKey: action === "Ctrl+Enter", bubbles: true }));
+  } else {
+    buttons.find((button) => buttonName(button) === "Save")!.click();
+  }
 
   expect(setRepeatingTaskSchedule).toHaveBeenCalledExactlyOnceWith("alice", "rent", {
     nextDate: "2026-02-28", interval: 2, intervalUnit: "Weeks", anchorDate: "2026-02-28",

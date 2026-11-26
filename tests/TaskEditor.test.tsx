@@ -68,7 +68,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   }
 });
 
-it.each(["Save", "Complete"])("saves edits to incomplete tasks when clicking %s", (action) => {
+it.each(["Save", "Complete", "Cmd+Enter", "Ctrl+Enter"])("saves edits to incomplete tasks with %s", (action) => {
   dispose = render(() => (
     <TaskEditor
       taskId="first"
@@ -89,7 +89,15 @@ it.each(["Save", "Complete"])("saves edits to incomplete tasks when clicking %s"
   details.dispatchEvent(new Event("input", { bubbles: true }));
   input.value = "Buy eggs";
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  [...document.querySelectorAll("button")].find((button) => (button.getAttribute("aria-label") ?? button.textContent) === action)!.click();
+  if (action === "Cmd+Enter" || action === "Ctrl+Enter") {
+    details.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(setTaskDetails).not.toHaveBeenCalled();
+    const shortcut = new KeyboardEvent("keydown", { key: "Enter", metaKey: action === "Cmd+Enter", ctrlKey: action === "Ctrl+Enter", bubbles: true, cancelable: true });
+    details.dispatchEvent(shortcut);
+    expect(shortcut.defaultPrevented).toBe(true);
+  } else {
+    [...document.querySelectorAll("button")].find((button) => (button.getAttribute("aria-label") ?? button.textContent) === action)!.click();
+  }
 
   expect(setTaskDetails).toHaveBeenCalledExactlyOnceWith("alice", "first", "Whole grain\nTwo loaves");
   expect(setTaskDate).toHaveBeenCalledExactlyOnceWith("alice", "first", "2026-10-05");
@@ -103,13 +111,14 @@ it.each(["Save", "Complete"])("saves edits to incomplete tasks when clicking %s"
 
 it("does not save a draft if the task is completed on another device", () => {
   const [task, setTask] = createSignal<Task>({ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") });
+  const onBack = vi.fn();
   dispose = render(() => (
     <TaskEditor
       taskId="first"
       task={task()}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
-      onBack={vi.fn()}
+      onBack={onBack}
     />
   ), document.body);
 
@@ -126,11 +135,12 @@ it("does not save a draft if the task is completed on another device", () => {
   expect(input.readOnly).toBe(true);
   expect(date.readOnly).toBe(true);
   expect(details.readOnly).toBe(true);
-  document.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click();
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true }));
 
   expect(setTaskDetails).not.toHaveBeenCalled();
   expect(setTaskTitle).not.toHaveBeenCalled();
   expect(setTaskDate).not.toHaveBeenCalled();
+  expect(onBack).toHaveBeenCalledOnce();
 });
 
 it("prevents saving a cleared task date", () => {

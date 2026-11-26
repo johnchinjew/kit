@@ -5,7 +5,8 @@ import Select from "./components/Select";
 import TextArea from "./components/TextArea";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
-import { createSignal, type JSX } from "solid-js";
+import { createSignal, onCleanup, onMount, type JSX } from "solid-js";
+import { isSaveShortcut } from "./shortcuts";
 import { maxInterval, type IntervalUnit, type RepeatingTask, type Schedule } from "./repeatingTask";
 import type { SignedIn } from "./session";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
@@ -83,12 +84,23 @@ export default function RepeatingTaskEditor(props: {
     }));
   };
 
-  const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+  const saveAndBack = () => {
     if (!saveSchedule()) return;
     saveTitle();
     saveDetails();
     props.onBack();
   };
+
+  onMount(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!isSaveShortcut(event)) return;
+      event.preventDefault();
+      saveAndBack();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+  });
 
   const onClickDelete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
     if (!window.confirm("Delete repeating task?")) return;
@@ -157,7 +169,7 @@ export default function RepeatingTaskEditor(props: {
   return (
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="justify-self-start">
-        <IconButton aria-label="Save" onClick={onClickBack}>←</IconButton>
+        <IconButton aria-label="Save" onClick={saveAndBack}>←</IconButton>
       </div>
       <Field label="Title">
         <Input

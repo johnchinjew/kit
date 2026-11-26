@@ -322,15 +322,20 @@ it("discards the draft and returns to the list when Cancel is pressed", () => {
   expect(document.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe("");
 });
 
-it("creates an untitled task for today when saving a fresh draft", () => {
+it.each(["Save", "Cmd+Enter", "Ctrl+Enter"])("creates an untitled task for today when saving a fresh draft with %s", (action) => {
   vi.mocked(subscribeUserData).mockReturnValue(vi.fn());
   dispose = render(() => <App />, document.body);
   [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
   expect(createTask).not.toHaveBeenCalled();
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
+  if (action === "Cmd+Enter" || action === "Ctrl+Enter") {
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: action === "Cmd+Enter", ctrlKey: action === "Ctrl+Enter", bubbles: true }));
+  } else {
+    document.querySelector<HTMLButtonElement>('[aria-label="Save"]')!.click();
+  }
   expect(createTask).toHaveBeenCalledExactlyOnceWith("alice", expect.any(String), "", "", "2026-11-04");
   expect(createRepeatingTask).not.toHaveBeenCalled();
+  expect(document.querySelector('[name="title"]')).toBeNull();
 });
 
 it("accepts a date one year from today and rejects the following day", () => {

@@ -3,9 +3,10 @@ import Fieldset from "./components/Fieldset";
 import Input from "./components/Input";
 import Select from "./components/Select";
 import TextArea from "./components/TextArea";
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
+import { isSaveShortcut } from "./shortcuts";
 import { maxInterval, type IntervalUnit } from "./repeatingTask";
 import type { SignedIn } from "./session";
 import { decodeTaskDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "./taskDate";
@@ -31,7 +32,7 @@ export default function TaskCreator(props: {
     setInterval(Math.min(interval(), maxInterval(unit)));
   }
 
-  function onClickBack() {
+  const saveAndBack = () => {
     let validatedDate: TaskDate;
     try {
       validatedDate = decodeTaskDate(date());
@@ -59,12 +60,23 @@ export default function TaskCreator(props: {
       });
     }
     props.onBack();
-  }
+  };
+
+  onMount(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!isSaveShortcut(event)) return;
+      event.preventDefault();
+      saveAndBack();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+  });
 
   return (
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="flex justify-between">
-        <IconButton aria-label="Save" onClick={onClickBack}>←</IconButton>
+        <IconButton aria-label="Save" onClick={saveAndBack}>←</IconButton>
         <TextButton danger onClick={props.onBack}>Cancel</TextButton>
       </div>
       <Field label="Title">

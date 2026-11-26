@@ -3,7 +3,8 @@ import Input from "./components/Input";
 import TextArea from "./components/TextArea";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
-import { createSignal, Show, type JSX } from "solid-js";
+import { createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { isSaveShortcut } from "./shortcuts";
 import type { SignedIn } from "./session";
 import type { Task } from "./task";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
@@ -54,12 +55,23 @@ export default function TaskEditor(props: {
     }));
   };
 
-  const onClickBack: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
+  const saveAndBack = () => {
     if (!saveDate()) return;
     saveTitle();
     saveDetails();
     props.onBack();
   };
+
+  onMount(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!isSaveShortcut(event)) return;
+      event.preventDefault();
+      saveAndBack();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+  });
 
   const onClickComplete: JSX.EventHandler<HTMLButtonElement, MouseEvent> = () => {
     if (!saveDate()) return;
@@ -129,7 +141,7 @@ export default function TaskEditor(props: {
   return (
     <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <header class="flex justify-between">
-        <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={onClickBack}>←</IconButton>
+        <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
         <Show when={props.task.completedAt === null} fallback={
           <TextButton onClick={onClickReopen}>
             Reopen
