@@ -175,9 +175,11 @@ it("catches up offline and does not duplicate occurrences after an offline resta
     await disableNetwork(firestore);
     void createTasksFromRepeatingTasks("offline-recurrence", { tasks: {}, repeatingTasks: { walk: repeatingTask } }).catch(() => {});
     const cached = (await getDocFromCache(doc(firestore, "users", "offline-recurrence"))).data()!;
-    expect(Object.values(cached.tasks).map((task) => (task as { date: string }).date).sort()).toEqual([
+    const cachedTasks = Object.values<{ date: string; repeatingTaskId?: string }>(cached.tasks);
+    expect(cachedTasks.map((task) => task.date).sort()).toEqual([
       firstDate, taskDateFromUtcDate(new Date(date.getTime() + 86_400_000)), today,
     ]);
+    expect(cachedTasks.map((task) => task.repeatingTaskId)).toEqual(["walk", "walk", "walk"]);
     const tomorrow = taskDateFromUtcDate(new Date(utcDateFromTaskDate(today).getTime() + 86_400_000));
     expect(cached.repeatingTasks.walk.schedule.nextDate).toBe(tomorrow);
 

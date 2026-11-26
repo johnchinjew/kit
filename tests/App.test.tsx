@@ -461,6 +461,61 @@ it("projects a repeating task separately from its generated tasks", () => {
 
 });
 
+it.each([false, true])("returns to the originating task editor after viewing its schedule, completed=%s", (completed) => {
+  const date = decodeTaskDate("2026-11-04");
+  const nextDate = decodeTaskDate("2026-11-05");
+  const task = { title: "Rent occurrence", details: "", date, repeatingTaskId: "rent", completedAt: completed ? Timestamp.now() : null };
+  const repeatingTask = {
+    title: "Rent schedule", details: "Pay by bank transfer",
+    schedule: { nextDate, interval: 1, intervalUnit: "Months" as const, anchorDate: date },
+    scheduleEditedAt: Timestamp.now(),
+  };
+  let receive!: (data: UserData) => void;
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    receive({ tasks: { task }, repeatingTasks: { rent: repeatingTask } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+
+  if (completed) {
+    const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
+    select.value = "Completed";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  document.querySelector<HTMLButtonElement>("li button")!.click();
+  const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
+  if (!completed) {
+    title.value = "Local draft";
+    title.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  const heading = document.querySelector("h2")!;
+  expect(heading.textContent).toBe("Repeating task");
+  const repeatingTaskButton = heading.parentElement!.querySelector("button")!;
+  expect(repeatingTaskButton.textContent).toContain(repeatingTask.title);
+  expect(repeatingTaskButton.textContent).toContain(repeatingTask.details);
+  expect(repeatingTaskButton.querySelector('[role="img"][aria-label="Repeating task"]')?.textContent).toBe("↻");
+  expect(repeatingTaskButton.querySelector("time")?.getAttribute("datetime")).toBe(nextDate);
+  expect(repeatingTaskButton.querySelector("time")?.textContent).toBe("Tomorrow");
+  repeatingTaskButton.click();
+
+  expect(document.querySelectorAll("main")).toHaveLength(1);
+  const editor = document.querySelector("main")!;
+  expect(editor.querySelector<HTMLInputElement>('[name="title"]')?.value).toBe("Rent schedule");
+  expect(editor.querySelector<HTMLInputElement>('[name="nextDate"]')?.value).toBe(nextDate);
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, cancelable: true }));
+  expect(document.querySelector('[name="nextDate"]')).toBeNull();
+  const draftTitle = completed ? "Rent occurrence" : "Local draft";
+  expect(document.querySelector<HTMLInputElement>('[name="title"]')?.value).toBe(draftTitle);
+
+  document.querySelector("h2")!.parentElement!.querySelector("button")!.click();
+  expect(document.querySelector('[name="nextDate"]')).not.toBeNull();
+  receive({ tasks: { task }, repeatingTasks: {} });
+  expect(document.querySelector('[name="nextDate"]')).toBeNull();
+  expect(document.querySelector<HTMLInputElement>('[name="title"]')?.value).toBe(draftTitle);
+  expect(document.querySelector("h2")).toBeNull();
+});
+
 it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft during live updates", (kind) => {
   const task = { title: "Task", details: "", date: decodeTaskDate("2026-11-05"), completedAt: null };
   const repeatingTask = {
@@ -488,6 +543,7 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   const input = document.querySelector<HTMLInputElement>('[name="title"]')!;
   expect(input.value).toBe(kind === "Task" ? "Task" : "Repeating");
   expect(document.querySelector('[name="intervalUnit"]') !== null).toBe(kind === "RepeatingTask");
+  expect([...document.querySelectorAll("h2")].map((heading) => heading.textContent)).not.toContain("Repeating task");
   input.value = "Local draft";
   input.dispatchEvent(new Event("input", { bubbles: true }));
 

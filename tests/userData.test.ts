@@ -211,6 +211,7 @@ describe("User data: repeating task operations", () => {
       tasks: {
         [taskId]: {
           title: "Rent", details: "Pay landlord", completed: false, date: taskDateToday(),
+          repeatingTaskId: "repeating.task.with.dots",
           titleEditedAt: expect.any(Timestamp), detailsEditedAt: expect.any(Timestamp),
           completedEditedAt: expect.any(Timestamp), dateEditedAt: expect.any(Timestamp),
         }
@@ -510,6 +511,7 @@ describe("User data: subscription", () => {
       const task = {
         title: "Buy bread", details: "", completed, date: "2026-10-04",
         completedEditedAt: Timestamp.fromMillis(milliseconds),
+        repeatingTaskId: "bread",
       };
       receive({ data: () => ({ tasks: { first: task } }) } as unknown as DocumentSnapshot);
       expect(onUserData).toHaveBeenLastCalledWith({
@@ -517,6 +519,7 @@ describe("User data: subscription", () => {
           first: {
             title: "Buy bread", details: "", date: "2026-10-04",
             completedAt: completed ? Timestamp.fromMillis(milliseconds) : null,
+            repeatingTaskId: "bread",
           }
         }, repeatingTasks: {}
       });

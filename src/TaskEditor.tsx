@@ -3,7 +3,10 @@ import Input from "./components/Input";
 import TextArea from "./components/TextArea";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
-import { createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
+import RepeatingTaskEditor from "./RepeatingTaskEditor";
+import RepeatingTaskButton from "./RepeatingTaskButton";
+import type { RepeatingTask } from "./repeatingTask";
 import { isSaveShortcut } from "./shortcuts";
 import type { SignedIn } from "./session";
 import type { Task } from "./task";
@@ -26,6 +29,7 @@ type TaskDraft = {
 export default function TaskEditor(props: {
   taskId: string;
   task: Task;
+  repeatingTask?: RepeatingTask | undefined;
   session: SignedIn;
   showNotice: (message: string) => void;
   onBack: () => void;
@@ -33,6 +37,12 @@ export default function TaskEditor(props: {
   // Capture the task when the editor opens so unmodified fields don't overwrite remote edits.
   const initialTask = props.task;
   const [draft, setDraft] = createSignal<TaskDraft>(initialTask);
+  const [showRepeatingTaskEditor, setShowRepeatingTaskEditor] = createSignal(false);
+
+  createEffect(() => {
+    // Close the editor when the repeating task is deleted by this or another client.
+    if (!props.repeatingTask) setShowRepeatingTaskEditor(false);
+  });
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
     if (props.task.completedAt !== null) return;
@@ -64,7 +74,8 @@ export default function TaskEditor(props: {
 
   onMount(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (!isSaveShortcut(event)) return;
+      // If the repeating task editor is open, let it handle the shortcut instead.
+      if (showRepeatingTaskEditor() || !isSaveShortcut(event)) return;
       event.preventDefault();
       saveAndBack();
     }
@@ -139,51 +150,78 @@ export default function TaskEditor(props: {
   }
 
   return (
-    <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-      <header class="flex justify-between">
-        <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
-        <Show when={props.task.completedAt === null} fallback={
-          <TextButton onClick={onClickReopen}>
-            Reopen
-          </TextButton>
-        }>
-          <TextButton onClick={onClickComplete}>
-            Complete
-          </TextButton>
+    <Show when={showRepeatingTaskEditor() && props.repeatingTask} fallback={
+      <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <header class="flex justify-between">
+          <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
+          <Show when={props.task.completedAt === null} fallback={
+            <TextButton onClick={onClickReopen}>
+              Reopen
+            </TextButton>
+          }>
+            <TextButton onClick={onClickComplete}>
+              Complete
+            </TextButton>
+          </Show>
+        </header>
+        <Field label="Title">
+          <Input
+            name="title"
+            type="text"
+            value={draft().title}
+            readOnly={props.task.completedAt !== null}
+            onInput={onChangeTitle}
+          />
+        </Field>
+        <Field label="Details">
+          <TextArea
+            name="details"
+            value={draft().details}
+            readOnly={props.task.completedAt !== null}
+            onInput={onChangeDetails}
+          />
+        </Field>
+        <Field label="Date">
+          <Input
+            name="date"
+            type="date"
+            max={taskDateOneYearFromToday()}
+            value={draft().date}
+            readOnly={props.task.completedAt !== null}
+            onInput={onChangeDate}
+          />
+        </Field>
+        <Show when={props.repeatingTask}>
+          {(repeatingTask) => (
+            <div class="grid gap-1">
+              <h2 class="px-4 text-sm text-foreground-muted">Repeating task</h2>
+              <div class="rounded-md border border-border p-4">
+                <RepeatingTaskButton
+                  title={repeatingTask().title}
+                  details={repeatingTask().details}
+                  date={repeatingTask().schedule.nextDate}
+                  onClick={() => setShowRepeatingTaskEditor(true)}
+                />
+              </div>
+            </div>
+          )}
         </Show>
-      </header>
-      <Field label="Title">
-        <Input
-          name="title"
-          type="text"
-          value={draft().title}
-          readOnly={props.task.completedAt !== null}
-          onInput={onChangeTitle}
+        <div class="justify-self-end">
+          <TextButton danger onClick={onClickDelete}>
+            Delete
+          </TextButton>
+        </div>
+      </main>
+    }>
+      {(repeatingTask) => (
+        <RepeatingTaskEditor
+          repeatingTaskId={props.task.repeatingTaskId!}
+          repeatingTask={repeatingTask()}
+          session={props.session}
+          showNotice={props.showNotice}
+          onBack={() => setShowRepeatingTaskEditor(false)}
         />
-      </Field>
-      <Field label="Details">
-        <TextArea
-          name="details"
-          value={draft().details}
-          readOnly={props.task.completedAt !== null}
-          onInput={onChangeDetails}
-        />
-      </Field>
-      <Field label="Date">
-        <Input
-          name="date"
-          type="date"
-          max={taskDateOneYearFromToday()}
-          value={draft().date}
-          readOnly={props.task.completedAt !== null}
-          onInput={onChangeDate}
-        />
-      </Field>
-      <div class="justify-self-end">
-        <TextButton danger onClick={onClickDelete}>
-          Delete
-        </TextButton>
-      </div>
-    </main>
+      )}
+    </Show>
   );
 }

@@ -63,12 +63,38 @@ export async function createTasksFromRepeatingTasks(userId: string, data: UserDa
     for (const date of occurrenceDates(repeatingTask.schedule, today)) {
       const taskId = crypto.randomUUID();
       const current = { ...repeatingTask, schedule: { ...repeatingTask.schedule, nextDate: date } };
-      writes.push(createTask(userId, taskId, repeatingTask.title, repeatingTask.details, date));
+      writes.push(createTaskFromRepeatingTask(userId, taskId, repeatingTaskId, repeatingTask, date));
       writes.push(advanceRepeatingTask(userId, repeatingTaskId, current, taskId));
     }
   }
   // Await everything here so the caller can catch errors when the server responds, i.e. when online.
   await Promise.all(writes);
+}
+
+async function createTaskFromRepeatingTask(
+  userId: string,
+  taskId: string,
+  repeatingTaskId: string,
+  repeatingTask: RepeatingTask,
+  date: TaskDate,
+): Promise<void> {
+  const editedAt = Timestamp.now();
+  await setDoc(doc(getFirestore(), "users", userId), {
+    operation: { type: "CreateTask", taskId },
+    tasks: {
+      [taskId]: {
+        title: repeatingTask.title,
+        details: repeatingTask.details,
+        completed: false,
+        date,
+        repeatingTaskId,
+        titleEditedAt: editedAt,
+        detailsEditedAt: editedAt,
+        completedEditedAt: editedAt,
+        dateEditedAt: editedAt,
+      }
+    },
+  }, { merge: true });
 }
 
 async function advanceRepeatingTask(
@@ -269,13 +295,22 @@ function decodeTask(taskId: string, data: unknown): Task {
   } catch {
     throw new Error(`Invalid task ${taskId}: invalid date`);
   }
+
+  const { repeatingTaskId, title, details } = data;
+  const fields = {
+    ...(typeof repeatingTaskId === "string" ? { repeatingTaskId } : {}),
+    title,
+    details,
+    date,
+  };
+
   if (data.completed) {
     if (!(data.completedEditedAt instanceof Timestamp)) {
       throw new Error(`Invalid task ${taskId}: invalid completion timestamp`);
     }
-    return { title: data.title, details: data.details, date, completedAt: data.completedEditedAt };
+    return { ...fields, completedAt: data.completedEditedAt };
   }
-  return { title: data.title, details: data.details, date, completedAt: null };
+  return { ...fields, completedAt: null };
 }
 
 function decodeRepeatingTask(repeatingTaskId: string, data: unknown): RepeatingTask {

@@ -7,6 +7,7 @@ import {
   createRepeatingTask,
   createTasksFromRepeatingTasks,
   deleteRepeatingTask,
+  reopenTask,
   setRepeatingTaskDetails,
   setRepeatingTaskSchedule,
   setRepeatingTaskTitle,
@@ -163,14 +164,15 @@ it("keeps task edits independent from repeating task edits and leaves tasks afte
   ]);
 
   let stored = (await getDoc(doc(db, "users/alice"))).data()!;
-  expect(stored.tasks[taskId]).toMatchObject({ title: "Rent", date: "2026-02-01", completed: true });
+  expect(stored.tasks[taskId]).toMatchObject({ title: "Rent", date: "2026-02-01", completed: true, repeatingTaskId: "rent" });
   expect(stored.repeatingTasks.rent).toMatchObject({
     title: "Apartment rent", schedule: { nextDate: "2026-03-31", interval: 2, intervalUnit: "Months" },
   });
 
   await deleteRepeatingTask("alice", "rent");
   await expect(setRepeatingTaskTitle("alice", "rent", "Deleted repeating task")).rejects.toThrow();
+  await reopenTask("alice", taskId);
   stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(stored.repeatingTasks.rent).toBeUndefined();
-  expect(stored.tasks[taskId]).toMatchObject({ title: "Rent", date: "2026-02-01", completed: true });
+  expect(stored.tasks[taskId]).toMatchObject({ title: "Rent", date: "2026-02-01", completed: false, repeatingTaskId: "rent" });
 });

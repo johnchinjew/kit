@@ -31,8 +31,9 @@ Supported feature set:
 - Schedule list: all incomplete tasks and 1 year of occurrences for all repeating tasks, ordered by date.
 - Open list: all incomplete tasks, ordered by date. Each repeating task appears only once on its next occurrence date.
 - Completed list: all completed tasks, ordered by completion date. Tasks are deleted 400 days after completion.
-- Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task is fully
-  independent of that repeating task. Every task must have a date (up to 1 year away).
+- Task: title, details, date. Can be completed, reopened, and deleted. A task created from a repeating task retains a
+  link to that repeating task for convenience, but, is otherwise fully independent: editing/completing/deleting the task
+  has no effect on any repeating task. Every task must have a date (up to 1 year away).
 - Repeating task: title, details, next occurrence date, and repetition interval (up to 1 year away). Cannot be
   completed. Can be deleted. Open any occurrence to edit the same repeating task. Every occurrence dated today or
   earlier becomes a separate incomplete task.
