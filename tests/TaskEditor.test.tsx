@@ -32,7 +32,7 @@ it.each(["Back", "Reopen"])("keeps completed tasks read-only when clicking %s", 
   dispose = render(() => (
     <TaskEditor
       taskId="first"
-      task={{ title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
+      userData={{ tasks: { first: { title: "Buy bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() } }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={onBack}
@@ -72,7 +72,7 @@ it.each(["Save", "Complete", "Cmd+Enter", "Ctrl+Enter"])("saves edits to incompl
   dispose = render(() => (
     <TaskEditor
       taskId="first"
-      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      userData={{ tasks: { first: { title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") } }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
@@ -115,7 +115,7 @@ it("does not save a draft if the task is completed on another device", () => {
   dispose = render(() => (
     <TaskEditor
       taskId="first"
-      task={task()}
+      userData={{ tasks: { first: task() }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={onBack}
@@ -149,7 +149,7 @@ it("prevents saving a cleared task date", () => {
   dispose = render(() => (
     <TaskEditor
       taskId="first"
-      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      userData={{ tasks: { first: { title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") } }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -174,7 +174,7 @@ it.each(["Save", "Complete"])("rejects dates beyond one year when clicking %s", 
   dispose = render(() => (
     <TaskEditor
       taskId="first"
-      task={{ title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") }}
+      userData={{ tasks: { first: { title: "Buy bread", details: "", completedAt: null, date: decodeTaskDate("2026-10-04") } }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice}
       onBack={onBack}
@@ -205,7 +205,7 @@ it.each(["title", "date", "details"] as const)("saves only the edited %s when th
   dispose = render(() => (
     <TaskEditor
       taskId="first"
-      task={task()}
+      userData={{ tasks: { first: task() }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()}
       onBack={vi.fn()}
@@ -239,7 +239,7 @@ it("can clear details and reports a failed save", async () => {
   vi.mocked(setTaskDetails).mockRejectedValueOnce(new Error("Offline"));
   dispose = render(() => (
     <TaskEditor taskId="first"
-      task={{ title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+      userData={{ tasks: { first: { title: "Bread", details: "Two loaves", date: decodeTaskDate("2026-10-04"), completedAt: null } }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={showNotice} onBack={vi.fn()} />
   ), document.body);
@@ -259,7 +259,7 @@ it.each(["incomplete", "completed"])("deletes a %s task without saving its draft
     completedAt: state === "completed" ? Timestamp.now() : null,
   };
   const onBack = vi.fn();
-  dispose = render(() => <TaskEditor taskId="first" task={task}
+  dispose = render(() => <TaskEditor taskId="first" userData={{ tasks: { first: task }, repeatingTasks: {} }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()} onBack={onBack} />, document.body);
   const title = document.querySelector<HTMLInputElement>('[name="title"]')!;
@@ -282,7 +282,7 @@ it("reports a failed deletion", async () => {
   const showNotice = vi.fn();
   vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Delete failed"));
   dispose = render(() => <TaskEditor taskId="first"
-    task={{ title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() }}
+    userData={{ tasks: { first: { title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: Timestamp.now() } }, repeatingTasks: {} }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={showNotice} onBack={vi.fn()} />, document.body);
   [...document.querySelectorAll("button")].find((button) => button.textContent === "Delete")!.click();
@@ -294,7 +294,7 @@ it("does not delete a task when deletion is canceled", () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   const onBack = vi.fn();
   dispose = render(() => <TaskEditor taskId="first"
-    task={{ title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+    userData={{ tasks: { first: { title: "Bread", details: "", date: decodeTaskDate("2026-10-04"), completedAt: null } }, repeatingTasks: {} }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()} onBack={onBack} />, document.body);
 
@@ -308,7 +308,7 @@ it("does not delete a task when deletion is canceled", () => {
 it.each(["Save", "Complete"])("trims title and details when clicking %s", (action) => {
   dispose = render(() => <TaskEditor
       taskId="first"
-      task={{ title: "Original", details: "Original", date: decodeTaskDate("2026-10-04"), completedAt: null }}
+      userData={{ tasks: { first: { title: "Original", details: "Original", date: decodeTaskDate("2026-10-04"), completedAt: null } }, repeatingTasks: {} }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()} onBack={vi.fn()} />, document.body);
 

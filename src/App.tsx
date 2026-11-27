@@ -151,34 +151,25 @@ function AppSignedIn(props: {
           case "TaskEditor":
             return (
               <Show when={userData().tasks[current.taskId]} fallback={<AppLoading />}>
-                {(task) => (
-                  <TaskEditor
-                    taskId={current.taskId}
-                    task={task()}
-                    repeatingTask={
-                      task().repeatingTaskId === undefined
-                        ? undefined
-                        : userData().repeatingTasks[task().repeatingTaskId!]
-                    }
-                    session={props.session}
-                    showNotice={props.showNotice}
-                    onBack={() => setView({ type: "List" })}
-                  />
-                )}
+                <TaskEditor
+                  taskId={current.taskId}
+                  userData={userData()}
+                  session={props.session}
+                  showNotice={props.showNotice}
+                  onBack={() => setView({ type: "List" })}
+                />
               </Show>
             );
           case "RepeatingTaskEditor":
             return (
               <Show when={userData().repeatingTasks[current.repeatingTaskId]} fallback={<AppLoading />}>
-                {(repeatingTask) => (
-                  <RepeatingTaskEditor
-                    repeatingTaskId={current.repeatingTaskId}
-                    repeatingTask={repeatingTask()}
-                    session={props.session}
-                    showNotice={props.showNotice}
-                    onBack={() => setView({ type: "List" })}
-                  />
-                )}
+                <RepeatingTaskEditor
+                  repeatingTaskId={current.repeatingTaskId}
+                  userData={userData()}
+                  session={props.session}
+                  showNotice={props.showNotice}
+                  onBack={() => setView({ type: "List" })}
+                />
               </Show>
             );
         }

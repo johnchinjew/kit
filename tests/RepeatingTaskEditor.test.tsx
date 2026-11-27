@@ -29,13 +29,13 @@ it.each([true, false])("deletes a repeating task only when confirmation is accep
   const onBack = vi.fn();
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
-    repeatingTask={{
+    userData={{ tasks: {}, repeatingTasks: { rent: {
       title: "Rent", details: "Pay landlord",
       schedule: {
         nextDate: decodeTaskDate("2026-01-31"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-01-31"),
       },
       scheduleEditedAt: Timestamp.now(),
-    }}
+    } } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()}
     onBack={onBack}
@@ -57,13 +57,13 @@ it.each(["Save", "Cmd+Enter", "Ctrl+Enter"])("edits a repeating task with %s wit
   const onBack = vi.fn();
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
-    repeatingTask={{
+    userData={{ tasks: {}, repeatingTasks: { rent: {
       title: "Rent", details: "Pay landlord",
       schedule: {
         nextDate: decodeTaskDate("2026-01-31"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-01-31"),
       },
       scheduleEditedAt: Timestamp.now(),
-    }}
+    } } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()}
     onBack={onBack}
@@ -100,13 +100,13 @@ it.each(["Save", "Cmd+Enter", "Ctrl+Enter"])("edits a repeating task with %s wit
 it("preserves the monthly anchor when only the interval changes", () => {
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
-    repeatingTask={{
+    userData={{ tasks: {}, repeatingTasks: { rent: {
       title: "Rent", details: "",
       schedule: {
         nextDate: decodeTaskDate("2026-02-28"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-01-31"),
       },
       scheduleEditedAt: Timestamp.now(),
-    }}
+    } } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()}
     onBack={vi.fn()}
@@ -125,13 +125,13 @@ it("preserves the monthly anchor when only the interval changes", () => {
 it.each([2, 30])("keeps interval %s within the maximum when changing units", (initialInterval) => {
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
-    repeatingTask={{
+    userData={{ tasks: {}, repeatingTasks: { rent: {
       title: "Rent", details: "",
       schedule: {
         nextDate: decodeTaskDate("2026-02-28"), interval: initialInterval, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-02-28"),
       },
       scheduleEditedAt: Timestamp.now(),
-    }}
+    } } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()}
     onBack={vi.fn()}
@@ -154,13 +154,13 @@ it.each(["nextDate", "interval"])("rejects a cleared %s", (field) => {
   const onBack = vi.fn();
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
-    repeatingTask={{
+    userData={{ tasks: {}, repeatingTasks: { rent: {
       title: "Rent", details: "",
       schedule: {
         nextDate: decodeTaskDate("2026-02-28"), interval: 1, intervalUnit: "Months", anchorDate: decodeTaskDate("2026-01-31"),
       },
       scheduleEditedAt: Timestamp.now(),
-    }}
+    } } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={showNotice}
     onBack={onBack}
@@ -188,7 +188,7 @@ it.each(["edited", "unchanged", "reverted"])("saves only an edited schedule afte
   });
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="rent"
-    repeatingTask={repeatingTask()}
+    userData={{ tasks: {}, repeatingTasks: { rent: repeatingTask() } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()}
     onBack={vi.fn()}
@@ -239,13 +239,13 @@ it.each([
 ] as const)("resets the anchor when switching from %s to %s", (from, to, nextDate, anchorDate, followingDate) => {
   dispose = render(() => <RepeatingTaskEditor
     repeatingTaskId="walk"
-    repeatingTask={{
+    userData={{ tasks: {}, repeatingTasks: { walk: {
       title: "Walk", details: "",
       schedule: {
         nextDate: decodeTaskDate(nextDate), interval: 1, intervalUnit: from, anchorDate: decodeTaskDate(anchorDate),
       },
       scheduleEditedAt: Timestamp.now(),
-    }}
+    } } }}
     session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
     showNotice={vi.fn()}
     onBack={vi.fn()}
@@ -266,9 +266,9 @@ it.each([
 it("trims title and details when saving", () => {
   dispose = render(() => <RepeatingTaskEditor
       repeatingTaskId="first"
-      repeatingTask={{ title: "Original", details: "Original", schedule: {
+      userData={{ tasks: {}, repeatingTasks: { first: { title: "Original", details: "Original", schedule: {
         nextDate: decodeTaskDate("2026-10-04"), interval: 1, intervalUnit: "Days", anchorDate: decodeTaskDate("2026-10-04"),
-      }, scheduleEditedAt: Timestamp.now() }}
+      }, scheduleEditedAt: Timestamp.now() } } }}
       session={{ status: "SignedIn", user: { userId: "alice", photoUrl: null } }}
       showNotice={vi.fn()} onBack={vi.fn()} />, document.body);
 

@@ -7,7 +7,7 @@ import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
 import { createSignal, onCleanup, onMount, type JSX } from "solid-js";
 import { isSaveShortcut } from "./shortcuts";
-import { maxInterval, type IntervalUnit, type RepeatingTask, type Schedule } from "./repeatingTask";
+import { maxInterval, type IntervalUnit, type Schedule } from "./repeatingTask";
 import type { SignedIn } from "./session";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import {
@@ -15,6 +15,7 @@ import {
   setRepeatingTaskSchedule,
   setRepeatingTaskDetails,
   setRepeatingTaskTitle,
+  type UserData,
 } from "./userData";
 
 type RepeatingTaskDraft = {
@@ -32,13 +33,13 @@ type ScheduleDraft = {
 
 export default function RepeatingTaskEditor(props: {
   repeatingTaskId: string;
-  repeatingTask: RepeatingTask;
+  userData: UserData;
   session: SignedIn;
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
   // Capture the repeating task when the editor opens so unmodified fields don't overwrite remote edits.
-  const initialRepeatingTask = props.repeatingTask;
+  const initialRepeatingTask = props.userData.repeatingTasks[props.repeatingTaskId]!;
   const [draft, setDraft] = createSignal<RepeatingTaskDraft>(initialRepeatingTask);
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {

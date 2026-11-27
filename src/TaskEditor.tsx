@@ -6,10 +6,8 @@ import TextButton from "./components/TextButton";
 import BottomBar from "./components/BottomBar";
 import { createEffect, createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
-import type { RepeatingTask } from "./repeatingTask";
 import { isSaveShortcut } from "./shortcuts";
 import type { SignedIn } from "./session";
-import type { Task } from "./task";
 import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
 import {
   completeTask,
@@ -18,6 +16,7 @@ import {
   setTaskDate,
   setTaskDetails,
   setTaskTitle,
+  type UserData,
 } from "./userData";
 
 type TaskDraft = {
@@ -28,24 +27,29 @@ type TaskDraft = {
 
 export default function TaskEditor(props: {
   taskId: string;
-  task: Task;
-  repeatingTask?: RepeatingTask | undefined;
+  userData: UserData;
   session: SignedIn;
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
+  const task = () => props.userData.tasks[props.taskId]!;
+  const repeatingTask = () => {
+    const repeatingTaskId = task().repeatingTaskId;
+    return repeatingTaskId === undefined ? undefined : props.userData.repeatingTasks[repeatingTaskId];
+  };
+
   // Capture the task when the editor opens so unmodified fields don't overwrite remote edits.
-  const initialTask = props.task;
+  const initialTask = task();
   const [draft, setDraft] = createSignal<TaskDraft>(initialTask);
   const [showRepeatingTaskEditor, setShowRepeatingTaskEditor] = createSignal(false);
 
   createEffect(() => {
     // Close the editor when the repeating task is deleted by this or another client.
-    if (!props.repeatingTask) setShowRepeatingTaskEditor(false);
+    if (!repeatingTask()) setShowRepeatingTaskEditor(false);
   });
 
   const onChangeTitle: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.task.completedAt !== null) return;
+    if (task().completedAt !== null) return;
     setDraft((current) => ({
       ...current,
       title: event.currentTarget.value
@@ -53,12 +57,12 @@ export default function TaskEditor(props: {
   };
 
   const onChangeDetails: JSX.EventHandler<HTMLTextAreaElement, InputEvent> = (event) => {
-    if (props.task.completedAt !== null) return;
+    if (task().completedAt !== null) return;
     setDraft((current) => ({ ...current, details: event.currentTarget.value }));
   };
 
   const onChangeDate: JSX.EventHandler<HTMLInputElement, InputEvent> = (event) => {
-    if (props.task.completedAt !== null) return;
+    if (task().completedAt !== null) return;
     setDraft((current) => ({
       ...current,
       date: event.currentTarget.value
@@ -111,7 +115,7 @@ export default function TaskEditor(props: {
 
   function saveTitle() {
     const title = draft().title.trim();
-    if (props.task.completedAt === null && title !== initialTask.title) {
+    if (task().completedAt === null && title !== initialTask.title) {
       void setTaskTitle(props.session.user.userId, props.taskId, title).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
@@ -120,7 +124,7 @@ export default function TaskEditor(props: {
 
   function saveDetails() {
     const details = draft().details.trim();
-    if (props.task.completedAt === null && details !== initialTask.details) {
+    if (task().completedAt === null && details !== initialTask.details) {
       void setTaskDetails(props.session.user.userId, props.taskId, details).catch(() => {
         props.showNotice("Could not save task. Try again later.");
       });
@@ -130,7 +134,7 @@ export default function TaskEditor(props: {
   // Validate and save date changes for an incomplete task. Return false if the date is invalid.
   function saveDate() {
     const date = draft().date;
-    if (props.task.completedAt === null && date !== initialTask.date) {
+    if (task().completedAt === null && date !== initialTask.date) {
       let validatedDate: TaskDate;
       try {
         validatedDate = decodeTaskDate(date);
@@ -150,12 +154,12 @@ export default function TaskEditor(props: {
   }
 
   return (
-    <Show when={showRepeatingTaskEditor() && props.repeatingTask} fallback={
+    <Show when={showRepeatingTaskEditor() && repeatingTask() && task().repeatingTaskId} fallback={
       <div class="min-h-dvh flex flex-col">
         <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <header class="flex justify-between">
-            <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
-            <Show when={props.task.completedAt === null} fallback={
+            <IconButton aria-label={task().completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
+            <Show when={task().completedAt === null} fallback={
               <TextButton onClick={onClickReopen}>
                 Reopen
               </TextButton>
@@ -170,7 +174,7 @@ export default function TaskEditor(props: {
               name="title"
               type="text"
               value={draft().title}
-              readOnly={props.task.completedAt !== null}
+              readOnly={task().completedAt !== null}
               onInput={onChangeTitle}
             />
           </Field>
@@ -178,7 +182,7 @@ export default function TaskEditor(props: {
             <TextArea
               name="details"
               value={draft().details}
-              readOnly={props.task.completedAt !== null}
+              readOnly={task().completedAt !== null}
               onInput={onChangeDetails}
             />
           </Field>
@@ -188,7 +192,7 @@ export default function TaskEditor(props: {
               type="date"
               max={taskDateOneYearFromToday()}
               value={draft().date}
-              readOnly={props.task.completedAt !== null}
+              readOnly={task().completedAt !== null}
               onInput={onChangeDate}
             />
           </Field>
@@ -198,7 +202,7 @@ export default function TaskEditor(props: {
             </TextButton>
           </div>
         </main>
-        <Show when={props.repeatingTask}>
+        <Show when={repeatingTask()}>
           {(repeatingTask) => (
             <BottomBar>
               <TextButton variant="subtle" onClick={() => setShowRepeatingTaskEditor(true)}>
@@ -209,10 +213,10 @@ export default function TaskEditor(props: {
         </Show>
       </div>
     }>
-      {(repeatingTask) => (
+      {(repeatingTaskId) => (
         <RepeatingTaskEditor
-          repeatingTaskId={props.task.repeatingTaskId!}
-          repeatingTask={repeatingTask()}
+          repeatingTaskId={repeatingTaskId()}
+          userData={props.userData}
           session={props.session}
           showNotice={props.showNotice}
           onBack={() => setShowRepeatingTaskEditor(false)}
