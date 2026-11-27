@@ -14,9 +14,9 @@ import { containsSearchPhrase } from "./search";
 import TaskCreator from "./TaskCreator";
 import TaskEditor from "./TaskEditor";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
-import RepeatingTaskButton from "./RepeatingTaskButton";
 import Button from "./components/Button";
 import TextButton from "./components/TextButton";
+import BottomBar from "./components/BottomBar";
 import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
@@ -331,9 +331,9 @@ function ActionBar(props: {
   openTaskCreator: () => void;
 }) {
   return (
-    <div class="order-last isolate sticky bottom-0 mt-auto mx-auto flex justify-center w-full max-w-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] before:content-[''] before:absolute before:inset-0 before:-top-8 before:-z-10 before:pointer-events-none before:bg-background before:[mask-image:linear-gradient(to_bottom,transparent,rgb(0_0_0_/_70%)_1.5rem,rgb(0_0_0_/_90%)_2.25rem,black_3rem)]">
+    <BottomBar>
       <TextButton onClick={props.openTaskCreator}>＋ Add task</TextButton>
-    </div>
+    </BottomBar>
   );
 }
 
@@ -385,7 +385,7 @@ function SearchList(props: {
               case "Task":
                 return (
                   <li class="py-4 first:pt-0 last:pb-0">
-                    <TaskButton
+                    <TaskRow
                       title={row.title}
                       details={row.details}
                       date={row.date}
@@ -396,7 +396,7 @@ function SearchList(props: {
               case "RepeatingTask":
                 return (
                   <li class="py-4 first:pt-0 last:pb-0">
-                    <RepeatingTaskButton
+                    <RepeatingTaskRow
                       title={row.title}
                       details={row.details}
                       date={row.date}
@@ -407,7 +407,7 @@ function SearchList(props: {
               case "CompletedTask":
                 return (
                   <li class="py-4 first:pt-0 last:pb-0">
-                    <CompletedTaskButton
+                    <CompletedTaskRow
                       title={row.title}
                       completedAt={row.completedAt}
                       onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
@@ -471,14 +471,14 @@ function ScheduleList(props: {
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
               {row.type === "Task" ? (
-                <TaskButton
+                <TaskRow
                   title={row.title}
                   details={row.details}
                   date={row.date}
                   onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
                 />
               ) : (
-                <RepeatingTaskButton
+                <RepeatingTaskRow
                   title={row.title}
                   details={row.details}
                   date={row.date}
@@ -531,14 +531,14 @@ function OpenList(props: {
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
               {row.type === "Task" ? (
-                <TaskButton
+                <TaskRow
                   title={row.title}
                   details={row.details}
                   date={row.date}
                   onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
                 />
               ) : (
-                <RepeatingTaskButton
+                <RepeatingTaskRow
                   title={row.title}
                   details={row.details}
                   date={row.date}
@@ -592,7 +592,7 @@ function CompletedList(props: {
         <For each={completedRows(props.userData)}>
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
-              <CompletedTaskButton
+              <CompletedTaskRow
                 title={row.title}
                 completedAt={row.completedAt}
                 onClick={() => props.setView({ type: "TaskEditor", taskId: row.taskId })}
@@ -616,7 +616,7 @@ function completedRows(data: UserData): CompletedRow[] {
     .sort((left, right) => right.completedAt.seconds - left.completedAt.seconds || right.completedAt.nanoseconds - left.completedAt.nanoseconds);
 }
 
-function TaskButton(props: {
+function TaskRow(props: {
   title: string;
   details: string;
   date: TaskDate;
@@ -639,7 +639,32 @@ function TaskButton(props: {
   );
 }
 
-function CompletedTaskButton(props: {
+function RepeatingTaskRow(props: {
+  title: string;
+  details: string;
+  date: TaskDate;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 text-left cursor-pointer"
+      type="button"
+      onClick={props.onClick}
+    >
+      <span class="truncate" classList={{ "text-foreground-muted": !props.title }}>
+        {props.title || "Empty title"}
+      </span>
+      <span class="text-foreground-muted">
+        <span role="img" aria-label="Repeating task">↻</span> <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+      </span>
+      <Show when={props.details}>
+        <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
+      </Show>
+    </button>
+  );
+}
+
+function CompletedTaskRow(props: {
   title: string;
   completedAt: Timestamp;
   onClick: () => void;

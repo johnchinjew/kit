@@ -489,14 +489,9 @@ it.each([false, true])("returns to the originating task editor after viewing its
     title.value = "Local draft";
     title.dispatchEvent(new Event("input", { bubbles: true }));
   }
-  const heading = document.querySelector("h2")!;
-  expect(heading.textContent).toBe("Repeating task");
-  const repeatingTaskButton = heading.parentElement!.querySelector("button")!;
-  expect(repeatingTaskButton.textContent).toContain(repeatingTask.title);
-  expect(repeatingTaskButton.textContent).toContain(repeatingTask.details);
+  const repeatingTaskButton = [...document.querySelectorAll("button")].find((button) => button.textContent?.includes("Auto-created by"))!;
+  expect(repeatingTaskButton.textContent).toContain(`Auto-created by ${repeatingTask.title} ↻`);
   expect(repeatingTaskButton.querySelector('[role="img"][aria-label="Repeating task"]')?.textContent).toBe("↻");
-  expect(repeatingTaskButton.querySelector("time")?.getAttribute("datetime")).toBe(nextDate);
-  expect(repeatingTaskButton.querySelector("time")?.textContent).toBe("Tomorrow");
   repeatingTaskButton.click();
 
   expect(document.querySelectorAll("main")).toHaveLength(1);
@@ -508,12 +503,12 @@ it.each([false, true])("returns to the originating task editor after viewing its
   const draftTitle = completed ? "Rent occurrence" : "Local draft";
   expect(document.querySelector<HTMLInputElement>('[name="title"]')?.value).toBe(draftTitle);
 
-  document.querySelector("h2")!.parentElement!.querySelector("button")!.click();
+  [...document.querySelectorAll("button")].find((button) => button.textContent?.includes("Auto-created by"))!.click();
   expect(document.querySelector('[name="nextDate"]')).not.toBeNull();
   receive({ tasks: { task }, repeatingTasks: {} });
   expect(document.querySelector('[name="nextDate"]')).toBeNull();
   expect(document.querySelector<HTMLInputElement>('[name="title"]')?.value).toBe(draftTitle);
-  expect(document.querySelector("h2")).toBeNull();
+  expect([...document.querySelectorAll("button")].some((button) => button.textContent?.includes("Auto-created by"))).toBe(false);
 });
 
 it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft during live updates", (kind) => {
@@ -543,7 +538,7 @@ it.each(["Task", "RepeatingTask"])("switches editors and preserves the %s draft 
   const input = document.querySelector<HTMLInputElement>('[name="title"]')!;
   expect(input.value).toBe(kind === "Task" ? "Task" : "Repeating");
   expect(document.querySelector('[name="intervalUnit"]') !== null).toBe(kind === "RepeatingTask");
-  expect([...document.querySelectorAll("h2")].map((heading) => heading.textContent)).not.toContain("Repeating task");
+  expect([...document.querySelectorAll("button")].some((button) => button.textContent?.includes("Auto-created by"))).toBe(false);
   input.value = "Local draft";
   input.dispatchEvent(new Event("input", { bubbles: true }));
 

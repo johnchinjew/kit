@@ -3,9 +3,9 @@ import Input from "./components/Input";
 import TextArea from "./components/TextArea";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
+import BottomBar from "./components/BottomBar";
 import { createEffect, createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
-import RepeatingTaskButton from "./RepeatingTaskButton";
 import type { RepeatingTask } from "./repeatingTask";
 import { isSaveShortcut } from "./shortcuts";
 import type { SignedIn } from "./session";
@@ -151,67 +151,63 @@ export default function TaskEditor(props: {
 
   return (
     <Show when={showRepeatingTaskEditor() && props.repeatingTask} fallback={
-      <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <header class="flex justify-between">
-          <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
-          <Show when={props.task.completedAt === null} fallback={
-            <TextButton onClick={onClickReopen}>
-              Reopen
+      <div class="min-h-dvh flex flex-col">
+        <main class="mx-auto grid w-full max-w-lg gap-4 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <header class="flex justify-between">
+            <IconButton aria-label={props.task.completedAt === null ? "Save" : "Back"} onClick={saveAndBack}>←</IconButton>
+            <Show when={props.task.completedAt === null} fallback={
+              <TextButton onClick={onClickReopen}>
+                Reopen
+              </TextButton>
+            }>
+              <TextButton onClick={onClickComplete}>
+                Complete
+              </TextButton>
+            </Show>
+          </header>
+          <Field label="Title">
+            <Input
+              name="title"
+              type="text"
+              value={draft().title}
+              readOnly={props.task.completedAt !== null}
+              onInput={onChangeTitle}
+            />
+          </Field>
+          <Field label="Details">
+            <TextArea
+              name="details"
+              value={draft().details}
+              readOnly={props.task.completedAt !== null}
+              onInput={onChangeDetails}
+            />
+          </Field>
+          <Field label="Date">
+            <Input
+              name="date"
+              type="date"
+              max={taskDateOneYearFromToday()}
+              value={draft().date}
+              readOnly={props.task.completedAt !== null}
+              onInput={onChangeDate}
+            />
+          </Field>
+          <div class="justify-self-end">
+            <TextButton variant="danger" onClick={onClickDelete}>
+              Delete
             </TextButton>
-          }>
-            <TextButton onClick={onClickComplete}>
-              Complete
-            </TextButton>
-          </Show>
-        </header>
-        <Field label="Title">
-          <Input
-            name="title"
-            type="text"
-            value={draft().title}
-            readOnly={props.task.completedAt !== null}
-            onInput={onChangeTitle}
-          />
-        </Field>
-        <Field label="Details">
-          <TextArea
-            name="details"
-            value={draft().details}
-            readOnly={props.task.completedAt !== null}
-            onInput={onChangeDetails}
-          />
-        </Field>
-        <Field label="Date">
-          <Input
-            name="date"
-            type="date"
-            max={taskDateOneYearFromToday()}
-            value={draft().date}
-            readOnly={props.task.completedAt !== null}
-            onInput={onChangeDate}
-          />
-        </Field>
+          </div>
+        </main>
         <Show when={props.repeatingTask}>
           {(repeatingTask) => (
-            <div class="grid gap-1">
-              <h2 class="px-4 text-sm text-foreground-muted">Repeating task</h2>
-              <div class="rounded-md border border-border p-4">
-                <RepeatingTaskButton
-                  title={repeatingTask().title}
-                  details={repeatingTask().details}
-                  date={repeatingTask().schedule.nextDate}
-                  onClick={() => setShowRepeatingTaskEditor(true)}
-                />
-              </div>
-            </div>
+            <BottomBar>
+              <TextButton variant="subtle" onClick={() => setShowRepeatingTaskEditor(true)}>
+                Auto-created by <span class="font-semibold">{repeatingTask().title || "Empty title"}</span> <span role="img" aria-label="Repeating task">↻</span>
+              </TextButton>
+            </BottomBar>
           )}
         </Show>
-        <div class="justify-self-end">
-          <TextButton variant="danger" onClick={onClickDelete}>
-            Delete
-          </TextButton>
-        </div>
-      </main>
+      </div>
     }>
       {(repeatingTask) => (
         <RepeatingTaskEditor
