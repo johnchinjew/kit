@@ -207,7 +207,7 @@ export default function TaskEditor(props: {
           )}
         </Show>
         <div class="justify-self-end">
-          <TextButton danger onClick={onClickDelete}>
+          <TextButton variant="danger" onClick={onClickDelete}>
             Delete
           </TextButton>
         </div>

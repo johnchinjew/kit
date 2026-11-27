@@ -218,7 +218,7 @@ export default function RepeatingTaskEditor(props: {
         </div>
       </Fieldset>
       <div class="justify-self-end">
-        <TextButton danger onClick={onClickDelete}>
+        <TextButton variant="danger" onClick={onClickDelete}>
           Delete
         </TextButton>
       </div>
