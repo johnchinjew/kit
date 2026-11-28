@@ -173,7 +173,11 @@ it("catches up offline and does not duplicate occurrences after an offline resta
       repeatingTasks: { walk: repeatingTask },
     }, { merge: true });
     await disableNetwork(firestore);
-    void createTasksFromRepeatingTasks("offline-recurrence", { tasks: {}, repeatingTasks: { walk: repeatingTask } }).catch(() => {});
+    const submitted = new Set<string>();
+    const initialData = { tasks: {}, repeatingTasks: { walk: repeatingTask } };
+    void createTasksFromRepeatingTasks("offline-recurrence", initialData, today, submitted).catch(() => {});
+    await createTasksFromRepeatingTasks("offline-recurrence", initialData, today, submitted);
+    await createTasksFromRepeatingTasks("offline-recurrence", initialData, today, submitted);
     const cached = (await getDocFromCache(doc(firestore, "users", "offline-recurrence"))).data()!;
     const cachedTasks = Object.values<{ date: string; repeatingTaskId?: string }>(cached.tasks);
     expect(cachedTasks.map((task) => task.date).sort()).toEqual([
@@ -193,7 +197,7 @@ it("catches up offline and does not duplicate occurrences after an offline resta
     const restarted = await getDocFromCache(reference);
     expect(restarted.data()).toEqual(cached);
     expect(restarted.metadata.hasPendingWrites).toBe(true);
-    await createTasksFromRepeatingTasks("offline-recurrence", { tasks: {}, repeatingTasks: restarted.data()!.repeatingTasks });
+    await createTasksFromRepeatingTasks("offline-recurrence", { tasks: {}, repeatingTasks: restarted.data()!.repeatingTasks }, today, new Set());
     expect((await getDocFromCache(reference)).data()).toEqual(cached);
     await enableNetwork(firestore);
     await waitForPendingWrites(firestore);

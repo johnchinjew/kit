@@ -5,11 +5,11 @@ import Select from "./components/Select";
 import TextArea from "./components/TextArea";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
-import { createSignal, onCleanup, onMount, type JSX } from "solid-js";
+import { createSignal, onCleanup, onMount, useContext, type JSX } from "solid-js";
 import { isSaveShortcut } from "./shortcuts";
 import { maxInterval, type IntervalUnit, type Schedule } from "./repeatingTask";
 import type { SignedIn } from "./session";
-import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
+import { TodayContext, decodeTaskDate, taskDateOneYearAfter, taskDateToday, type TaskDate } from "./taskDate";
 import {
   deleteRepeatingTask,
   setRepeatingTaskSchedule,
@@ -38,6 +38,9 @@ export default function RepeatingTaskEditor(props: {
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
+  // Use this for UI that needs to be updated when today's date changes.
+  const today = useContext(TodayContext);
+
   // Capture the repeating task when the editor opens so unmodified fields don't overwrite remote edits.
   const initialRepeatingTask = props.userData.repeatingTasks[props.repeatingTaskId]!;
   const [draft, setDraft] = createSignal<RepeatingTaskDraft>(initialRepeatingTask);
@@ -146,7 +149,7 @@ export default function RepeatingTaskEditor(props: {
       props.showNotice("A next date is required.");
       return false;
     }
-    if (validatedNextDate > taskDateOneYearFromToday()) {
+    if (validatedNextDate > taskDateOneYearAfter(taskDateToday())) {
       props.showNotice("The next date cannot be more than 1 year in the future.");
       return false;
     }
@@ -191,7 +194,7 @@ export default function RepeatingTaskEditor(props: {
         <Input
           name="nextDate"
           type="date"
-          max={taskDateOneYearFromToday()}
+          max={taskDateOneYearAfter(today())}
           value={draft().schedule.nextDate}
           onInput={onChangeNextDate}
         />

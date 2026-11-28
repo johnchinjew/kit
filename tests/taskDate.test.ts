@@ -4,7 +4,7 @@ import {
   formatTaskDate,
   taskDateFromDate,
   taskDateFromUtcDate,
-  taskDateOneYearFromToday,
+  taskDateOneYearAfter,
   taskDateToday,
   utcDateFromTaskDate,
   type TaskDate,
@@ -52,15 +52,12 @@ it("uses the local calendar date near a UTC day boundary", () => {
 });
 
 it.each([
-  ["2026-10-05T01:00:00Z", "2027-10-04"],
-  ["2024-02-29T20:00:00Z", "2025-02-28"],
-  ["2023-02-28T20:00:00Z", "2024-02-28"],
-  ["2026-12-31T20:00:00Z", "2027-12-31"],
-])("calculates the one-year limit from %s", (now, expected) => {
-  vi.stubEnv("TZ", "America/Los_Angeles");
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(now));
-  expect(taskDateOneYearFromToday()).toBe(expected);
+  ["2026-10-04", "2027-10-04"],
+  ["2024-02-29", "2025-02-28"],
+  ["2023-02-28", "2024-02-28"],
+  ["2026-12-31", "2027-12-31"],
+])("calculates the one-year limit from %s", (date, expected) => {
+  expect(taskDateOneYearAfter(decodeTaskDate(date))).toBe(expected);
 });
 
 it.each(["2024-02-29", "2000-02-29", "2026-12-31"])("accepts calendar date %s", (date) => {

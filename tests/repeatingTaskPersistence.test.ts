@@ -13,19 +13,16 @@ import {
   setRepeatingTaskTitle,
   setTaskDate,
 } from "../src/userData";
-import { decodeTaskDate, taskDateToday } from "../src/taskDate";
+import { decodeTaskDate, type TaskDate } from "../src/taskDate";
 
 vi.mock("firebase/firestore", async (original) => {
   const firestore = await original<typeof import("firebase/firestore")>();
   return { ...firestore, getFirestore: vi.fn(), setDoc: vi.fn(firestore.setDoc) };
 });
 
-vi.mock("../src/taskDate", async (original) => ({
-  ...await original<typeof import("../src/taskDate")>(), taskDateToday: vi.fn(),
-}));
-
 let environment: RulesTestEnvironment;
 let db: Firestore;
+let today: TaskDate;
 const editedAt = Timestamp.fromMillis(Date.now() - 10_000);
 const schedule = {
   nextDate: decodeTaskDate("2026-01-31"),
@@ -47,7 +44,7 @@ beforeAll(async () => {
 });
 afterAll(async () => environment.cleanup());
 beforeEach(async () => {
-  vi.mocked(taskDateToday).mockReturnValue(decodeTaskDate("2026-01-31"));
+  today = decodeTaskDate("2026-01-31");
   await environment.clearFirestore();
   db = environment.authenticatedContext("alice").firestore() as unknown as Firestore;
   vi.mocked(getFirestore).mockReturnValue(db);
@@ -64,8 +61,8 @@ beforeEach(async () => {
 
 it("uses task UUIDs and allows duplicate tasks created concurrently for the same occurrence", async () => {
   const results = await Promise.allSettled([
-    createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }),
-    createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }),
+    createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set()),
+    createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set()),
   ]);
   expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
 
@@ -82,7 +79,7 @@ it("creates a task for an occurrence after the repeating task's title and detail
   await setRepeatingTaskTitle("alice", "rent", "Apartment rent");
   await setRepeatingTaskDetails("alice", "rent", "Pay by bank transfer");
 
-  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } });
+  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set());
 
   const stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(Object.values(stored.tasks)).toEqual([expect.objectContaining({ title: "Rent", details: "Pay landlord" })]);
@@ -91,12 +88,12 @@ it("creates a task for an occurrence after the repeating task's title and detail
 
 it("creates tasks for occurrences after the schedule changes or the repeating task is deleted", async () => {
   await setRepeatingTaskSchedule("alice", "rent", { ...schedule, nextDate: decodeTaskDate("2026-03-31") });
-  await expect(createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } })).rejects.toThrow();
+  await expect(createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set())).rejects.toThrow();
 
   await deleteRepeatingTask("alice", "rent");
   const repeatingTaskAtLaterDate = { ...repeatingTask, schedule: { ...schedule, nextDate: decodeTaskDate("2026-02-28") } };
-  vi.mocked(taskDateToday).mockReturnValue(decodeTaskDate("2026-02-28"));
-  await expect(createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTaskAtLaterDate } })).rejects.toThrow();
+  today = decodeTaskDate("2026-02-28");
+  await expect(createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTaskAtLaterDate } }, today, new Set())).rejects.toThrow();
 
   const stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(Object.values(stored.tasks).map((task) => (task as { date: string }).date).sort()).toEqual(["2026-01-31", "2026-02-28"]);
@@ -115,8 +112,8 @@ it("creates a repeating task without creating a task", async () => {
 });
 
 it("catches up several due dates while preserving the monthly anchor", async () => {
-  vi.mocked(taskDateToday).mockReturnValue(decodeTaskDate("2026-03-31"));
-  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } });
+  today = decodeTaskDate("2026-03-31");
+  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set());
 
   const stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(Object.values(stored.tasks).map((task) => (task as { date: string }).date).sort()).toEqual([
@@ -133,7 +130,7 @@ it("advances after the created task's date changes", async () => {
     taskId = (data as DocumentData).operation.taskId as string;
     await setTaskDate("alice", taskId, decodeTaskDate("2026-02-01"));
   });
-  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } });
+  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set());
 
   const stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(stored.tasks[taskId].date).toBe("2026-02-01");
@@ -142,15 +139,15 @@ it("advances after the created task's date changes", async () => {
 
 it("allows a task created for a later occurrence to advance the schedule when an earlier advancement is missing", async () => {
   const repeatingTaskAtLaterDate = { ...repeatingTask, schedule: { ...schedule, nextDate: decodeTaskDate("2026-02-28") } };
-  vi.mocked(taskDateToday).mockReturnValue(decodeTaskDate("2026-02-28"));
-  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTaskAtLaterDate } });
+  today = decodeTaskDate("2026-02-28");
+  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTaskAtLaterDate } }, today, new Set());
 
   const stored = (await getDoc(doc(db, "users/alice"))).data()!;
   expect(stored.repeatingTasks.rent.schedule.nextDate).toBe("2026-03-31");
 });
 
 it("keeps task edits independent from repeating task edits and leaves tasks after repeating task deletion", async () => {
-  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } });
+  await createTasksFromRepeatingTasks("alice", { tasks: {}, repeatingTasks: { rent: repeatingTask } }, today, new Set());
   const initial = (await getDoc(doc(db, "users/alice"))).data()!;
   const taskId = Object.keys(initial.tasks)[0]!;
   await Promise.all([

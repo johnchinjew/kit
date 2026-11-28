@@ -131,7 +131,8 @@ it("only shows the pre-alpha notice on the sign-in screen", () => {
   expect(feedbackLink?.isConnected).toBe(false);
 });
 
-it.each([false, true])("only processes the first snapshot, with initial due tasks=%s", async (initiallyDue) => {
+it.each([false, true])("starts with a leading tick and polls the latest snapshot, with initial due tasks=%s", async (initiallyDue) => {
+  vi.useFakeTimers();
   const data: UserData = {
     tasks: {}, repeatingTasks: {
       rent: {
@@ -157,13 +158,28 @@ it.each([false, true])("only processes the first snapshot, with initial due task
   await Promise.resolve();
 
   expect(createTasksFromRepeatingTasks).toHaveBeenCalledExactlyOnceWith(
-    "alice", initiallyDue ? data : { tasks: {}, repeatingTasks: {} },
+    "alice", initiallyDue ? data : { tasks: {}, repeatingTasks: {} }, decodeTaskDate("2026-11-04"), expect.any(Set),
   );
+  vi.advanceTimersByTime(1_000);
+  receive(data);
+  vi.advanceTimersByTime(1_000);
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledTimes(2);
+  expect(createTasksFromRepeatingTasks).toHaveBeenLastCalledWith(
+    "alice", data, decodeTaskDate("2026-11-04"), expect.any(Set),
+  );
+  expect(vi.mocked(createTasksFromRepeatingTasks).mock.calls[1]![3])
+    .toBe(vi.mocked(createTasksFromRepeatingTasks).mock.calls[0]![3]);
+  dispose!();
+  dispose = undefined;
+  vi.advanceTimersByTime(10_000);
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledTimes(2);
 });
 
-it("shows startup recurrence failures and does not retry on later snapshots", async () => {
+it.each([1, 2])("stops polling after a failure on tick %s and does not restart on later snapshots", async (failedTick) => {
+  vi.useFakeTimers();
   let rejectProcessing!: (error: Error) => void;
-  vi.mocked(createTasksFromRepeatingTasks).mockReturnValue(new Promise<void>((_resolve, reject) => {
+  if (failedTick === 2) vi.mocked(createTasksFromRepeatingTasks).mockResolvedValueOnce(undefined);
+  vi.mocked(createTasksFromRepeatingTasks).mockReturnValueOnce(new Promise<void>((_resolve, reject) => {
     rejectProcessing = reject;
   }));
   const data: UserData = {
@@ -185,13 +201,40 @@ it("shows startup recurrence failures and does not retry on later snapshots", as
   });
   dispose = render(() => <App />, document.body);
 
+  await Promise.resolve();
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledOnce();
+  expect(document.body.textContent).not.toContain("Could not update repeating tasks");
+  vi.advanceTimersByTime((failedTick - 1) * 2_000);
   rejectProcessing(new Error("Write failed"));
-  await vi.waitFor(() => expect(document.body.textContent).toContain(
-    "Could not update repeating tasks. Please close and reopen Kit.",
-  ));
+  await Promise.resolve();
+  expect(document.body.textContent).toContain("Could not update repeating tasks. Please close and reopen Kit.");
   receive(data);
   await Promise.resolve();
-  expect(createTasksFromRepeatingTasks).toHaveBeenCalledExactlyOnceWith("alice", data);
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledTimes(failedTick);
+  vi.mocked(createTasksFromRepeatingTasks).mockResolvedValue(undefined);
+  vi.advanceTimersByTime(10_000);
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledTimes(failedTick);
+});
+
+it("halts automatic date updates along with recurrence processing after a failure", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 10, 4, 23, 59, 59));
+  vi.mocked(createTasksFromRepeatingTasks).mockRejectedValueOnce(new Error("Write failed"));
+  vi.mocked(subscribeUserData).mockImplementation((_userId, receive) => {
+    receive({ tasks: {
+      task: { title: "Task", details: "", date: decodeTaskDate("2026-11-04"), completedAt: null },
+    }, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  expect(document.querySelector("time")!.textContent).toBe("Today");
+  await Promise.resolve();
+  expect(document.body.textContent).toContain("Could not update repeating tasks. Please close and reopen Kit.");
+
+  vi.advanceTimersByTime(2_000);
+
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledOnce();
+  expect(document.querySelector("time")!.textContent).toBe("Today");
 });
 
 it("orders completed tasks by completion instant and displays completion dates", () => {
@@ -864,4 +907,121 @@ it("shows a missing-date alert and prevents saving", () => {
 
   expect(document.querySelector('[role="alert"]')?.textContent).toBe("A date is required.");
   expect(createTask).not.toHaveBeenCalled();
+});
+
+it("refreshes task, repeating, and completed date labels and the horizon across year rollover", () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 11, 31, 23, 59, 59));
+  vi.mocked(subscribeUserData).mockImplementation((_userId, receive) => {
+    receive({ tasks: {
+      task: { title: "Task", details: "", date: decodeTaskDate("2026-12-31"), completedAt: null },
+      older: { title: "Older", details: "", date: decodeTaskDate("2026-12-20"), completedAt: null },
+      completed: { title: "Done", details: "", date: decodeTaskDate("2026-12-31"), completedAt: Timestamp.now() },
+    }, repeatingTasks: {
+      yearly: { title: "Yearly", details: "", scheduleEditedAt: Timestamp.now(), schedule: {
+        nextDate: decodeTaskDate("2027-01-01"), anchorDate: decodeTaskDate("2027-01-01"), interval: 1, intervalUnit: "Years",
+      } },
+    } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  const times = () => [...document.querySelectorAll("time")].map((time) => time.textContent);
+  expect(times()).toContain("Today");
+  expect(times()).toContain("Tomorrow");
+  expect(document.querySelector('time[datetime="2028-01-01"]')).toBeNull();
+  const olderLabel = document.querySelector('time[datetime="2026-12-20"]')!.textContent;
+
+  vi.advanceTimersByTime(2_000);
+  expect(times()).toContain("Yesterday");
+  expect(times()).toContain("Today");
+  expect(document.querySelector('time[datetime="2028-01-01"]')).not.toBeNull();
+  expect(document.querySelector('time[datetime="2026-12-20"]')!.textContent).not.toBe(olderLabel);
+  const row = document.querySelector("li");
+  vi.advanceTimersByTime(2_000);
+  expect(document.querySelector("li")).toBe(row);
+
+  const select = document.querySelector<HTMLSelectElement>('[aria-label="List selector"]')!;
+  select.value = "Completed";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  expect(times()).toContain("Completed Yesterday");
+  vi.setSystemTime(new Date(2026, 11, 31, 12));
+  vi.advanceTimersByTime(2_000);
+  expect(times()).toContain("Completed Today");
+});
+
+it.each(["creator", "task", "repeat"])("refreshes the %s date limit after suspension without replacing its draft", (editor) => {
+  vi.useFakeTimers();
+  vi.mocked(subscribeUserData).mockImplementation((_userId, receive) => {
+    receive({ tasks: {
+      task: { title: "Task", details: "", date: decodeTaskDate("2026-11-04"), completedAt: null },
+    }, repeatingTasks: {
+      yearly: { title: "Yearly", details: "", scheduleEditedAt: Timestamp.now(), schedule: {
+        nextDate: decodeTaskDate("2026-11-04"), anchorDate: decodeTaskDate("2026-11-04"), interval: 1, intervalUnit: "Years",
+      } },
+    } });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  if (editor === "creator") {
+    [...document.querySelectorAll("button")].find((button) => /\bAdd task$/.test(button.textContent ?? ""))!.click();
+  } else {
+    [...document.querySelectorAll("li button")].find((button) => button.textContent!.includes(editor === "task" ? "Task" : "Yearly"))!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  }
+  const input = document.querySelector<HTMLInputElement>('input[type="date"]')!;
+  input.value = "2027-02-01";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(input.max).toBe("2027-11-04");
+  vi.setSystemTime(new Date(2026, 10, 8, 12));
+  vi.advanceTimersByTime(2_000);
+  expect(input.max).toBe("2027-11-08");
+  expect(input.value).toBe("2027-02-01");
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(createTasksFromRepeatingTasks).mock.lastCall![2]).toBe("2026-11-08");
+});
+
+it("waits for data, stops polling on sign-out, and ignores late generation failures", async () => {
+  vi.useFakeTimers();
+  const [session, setSession] = createSignal<Session>({ status: "SignedIn", user: { userId: "alice", photoUrl: null } });
+  vi.mocked(createSession).mockReturnValueOnce({ session, signIn: vi.fn(), signOut: vi.fn() });
+  let receive!: (data: UserData) => void;
+  const unsubscribe = vi.fn();
+  vi.mocked(subscribeUserData).mockImplementation((_userId, onData) => {
+    receive = onData;
+    return unsubscribe;
+  });
+  let reject!: (error: Error) => void;
+  vi.mocked(createTasksFromRepeatingTasks).mockReturnValueOnce(new Promise((_resolve, rejectPromise) => { reject = rejectPromise; }));
+  dispose = render(() => <App />, document.body);
+  vi.advanceTimersByTime(6_000);
+  expect(createTasksFromRepeatingTasks).not.toHaveBeenCalled();
+  receive({ tasks: {}, repeatingTasks: {} });
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledOnce();
+  setSession({ status: "SignedOut" });
+  reject(new Error("Late failure"));
+  await Promise.resolve();
+  vi.advanceTimersByTime(6_000);
+  expect(unsubscribe).toHaveBeenCalledOnce();
+  expect(createTasksFromRepeatingTasks).toHaveBeenCalledOnce();
+  expect(document.body.textContent).not.toContain("Could not update repeating tasks");
+});
+
+it("detects a local date change caused by a timezone change on the next tick", () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 10, 4, 12));
+  vi.mocked(subscribeUserData).mockImplementation((_userId, receive) => {
+    receive({ tasks: { task: { title: "Task", details: "", completedAt: null, date: decodeTaskDate("2026-11-04") } }, repeatingTasks: {} });
+    return vi.fn();
+  });
+  dispose = render(() => <App />, document.body);
+  expect(document.querySelector("time")!.textContent).toBe("Today");
+  // Simulate the clock's local calendar reading changing without elapsed time.
+  const localDay = vi.spyOn(Date.prototype, "getDate").mockReturnValue(5);
+  try {
+    vi.advanceTimersByTime(2_000);
+    expect(document.querySelector("time")!.textContent).toBe("Yesterday");
+    expect(vi.mocked(createTasksFromRepeatingTasks).mock.lastCall![2]).toBe("2026-11-05");
+  } finally {
+    localDay.mockRestore();
+  }
 });

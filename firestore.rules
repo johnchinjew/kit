@@ -37,7 +37,7 @@ service cloud.firestore {
             && operation.taskId in oldTasks && !(operation.taskId in tasks))
           || (operation.type == 'DeleteTaskWithElapsedRetention' && operation.taskId is string
             && !(operation.taskId in tasks)
-            && validDeletionForTaskWithElapsedRetention(operation, oldTasks))
+            && validTaskAutoDeletion(operation, oldTasks))
           || (operation.type in ['SetTaskTitle', 'SetTaskDetails', 'SetTaskDate', 'CompleteTask', 'ReopenTask']
             && operation.taskId is string && operation.taskId in oldTasks && operation.taskId in tasks
             && validTaskEdit(operation, tasks[operation.taskId], oldTasks[operation.taskId]))
@@ -68,7 +68,7 @@ service cloud.firestore {
         && validEditTime(task.completedEditedAt);
     }
 
-    function validDeletionForTaskWithElapsedRetention(operation, oldTasks) {
+    function validTaskAutoDeletion(operation, oldTasks) {
       return operation.completedAt is timestamp
         && (!(operation.taskId in oldTasks)
           || (oldTasks[operation.taskId].completed == true

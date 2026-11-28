@@ -15,7 +15,7 @@ import {
   type RepeatingTask,
   type Schedule
 } from "./repeatingTask";
-import { decodeTaskDate, taskDateToday, type TaskDate } from "./taskDate";
+import { decodeTaskDate, type TaskDate } from "./taskDate";
 
 export type UserData = {
   tasks: Record<string, Task>;
@@ -53,14 +53,32 @@ export async function createTask(
   }, { merge: true });
 }
 
-export async function createTasksFromRepeatingTasks(userId: string, data: UserData): Promise<void> {
-  const today = taskDateToday();
+// Reuse the submittedTaskCreations set across all calls of createTasksFromRepeatingTasks() to prevent duplicate tasks
+// from being created, which happens when createTasksFromRepeatingTasks() is called before an updated snapshot arrives.
+export async function createTasksFromRepeatingTasks(
+  userId: string,
+  userData: UserData,
+  today: TaskDate,
+  submittedTaskCreations: Set<string>,
+): Promise<void> {
 
   // setDoc() immediately applies the mutation locally, but its promise does not resolve until the server accepts.
   // To avoid getting stuck at the first write while offline, submit all the writes before awaiting their promises.
   const writes: Promise<void>[] = [];
-  for (const [repeatingTaskId, repeatingTask] of Object.entries(data.repeatingTasks)) {
+  for (const [repeatingTaskId, repeatingTask] of Object.entries(userData.repeatingTasks)) {
     for (const date of occurrenceDates(repeatingTask.schedule, today)) {
+      // Skip if we already created a task
+      const key = JSON.stringify({
+        repeatingTaskId,
+        scheduleEditedAt: repeatingTask.scheduleEditedAt,
+        date,
+      });
+      if (submittedTaskCreations.has(key)) {
+        continue;
+      }
+      submittedTaskCreations.add(key);
+
+      // Create a task and advance the repeating task
       const taskId = crypto.randomUUID();
       const current = { ...repeatingTask, schedule: { ...repeatingTask.schedule, nextDate: date } };
       writes.push(createTaskFromRepeatingTask(userId, taskId, repeatingTaskId, repeatingTask, date));

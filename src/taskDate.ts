@@ -1,5 +1,9 @@
+import { createContext, type Accessor } from "solid-js";
+
 declare const brand: unique symbol;
 export type TaskDate = string & { readonly [brand]: true; };
+
+export const TodayContext = createContext<Accessor<TaskDate>>(taskDateToday);
 
 export function utcDateFromTaskDate(date: TaskDate): Date {
   return new Date(`${date}T00:00:00Z`);
@@ -31,12 +35,12 @@ export function taskDateFromDate(date: Date): TaskDate {
   return decodeTaskDate(`${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
 }
 
-export function taskDateOneYearFromToday(): TaskDate {
-  const date = utcDateFromTaskDate(taskDateToday());
-  const month = date.getUTCMonth();
-  date.setUTCFullYear(date.getUTCFullYear() + 1);
-  if (date.getUTCMonth() !== month) date.setUTCDate(0);
-  return taskDateFromUtcDate(date);
+export function taskDateOneYearAfter(date: TaskDate): TaskDate {
+  const endDate = utcDateFromTaskDate(date);
+  const endMonth = endDate.getUTCMonth();
+  endDate.setUTCFullYear(endDate.getUTCFullYear() + 1);
+  if (endDate.getUTCMonth() !== endMonth) endDate.setUTCDate(0);
+  return taskDateFromUtcDate(endDate);
 }
 
 export function decodeTaskDate(value: unknown): TaskDate {

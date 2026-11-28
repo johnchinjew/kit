@@ -4,11 +4,11 @@ import TextArea from "./components/TextArea";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
 import BottomBar from "./components/BottomBar";
-import { createEffect, createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show, useContext, type JSX } from "solid-js";
 import RepeatingTaskEditor from "./RepeatingTaskEditor";
 import { isSaveShortcut } from "./shortcuts";
 import type { SignedIn } from "./session";
-import { decodeTaskDate, taskDateOneYearFromToday, type TaskDate } from "./taskDate";
+import { TodayContext, decodeTaskDate, taskDateOneYearAfter, taskDateToday, type TaskDate } from "./taskDate";
 import {
   completeTask,
   deleteTask,
@@ -32,6 +32,9 @@ export default function TaskEditor(props: {
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
+  // Use this for UI that needs to be updated when today's date changes.
+  const today = useContext(TodayContext);
+
   const task = () => props.userData.tasks[props.taskId]!;
   const repeatingTask = () => {
     const repeatingTaskId = task().repeatingTaskId;
@@ -142,7 +145,7 @@ export default function TaskEditor(props: {
         props.showNotice("A date is required.");
         return false;
       }
-      if (validatedDate > taskDateOneYearFromToday()) {
+      if (validatedDate > taskDateOneYearAfter(taskDateToday())) {
         props.showNotice("The date cannot be more than 1 year in the future.");
         return false;
       }
@@ -190,7 +193,7 @@ export default function TaskEditor(props: {
             <Input
               name="date"
               type="date"
-              max={taskDateOneYearFromToday()}
+              max={taskDateOneYearAfter(today())}
               value={draft().date}
               readOnly={task().completedAt !== null}
               onInput={onChangeDate}

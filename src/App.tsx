@@ -8,7 +8,8 @@ import {
   onMount,
   Show,
   Switch,
-  untrack
+  untrack,
+  useContext
 } from "solid-js";
 import { containsSearchPhrase } from "./search";
 import TaskCreator from "./TaskCreator";
@@ -20,7 +21,14 @@ import BottomBar from "./components/BottomBar";
 import Notice from "./components/Notice";
 import type { Timestamp } from "firebase/firestore";
 import { occurrenceDates } from "./repeatingTask";
-import { formatTaskDate, taskDateFromDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "./taskDate";
+import {
+  TodayContext,
+  formatTaskDate,
+  taskDateFromDate,
+  taskDateOneYearAfter,
+  taskDateToday,
+  type TaskDate
+} from "./taskDate";
 import { createNotice } from "./notice";
 import { createSession, type SignedIn } from "./session";
 import {
@@ -84,6 +92,7 @@ function AppSignedIn(props: {
   signOut: () => void;
   showNotice: (message: string) => void;
 }) {
+  const [today, setToday] = createSignal(taskDateToday());
   const [view, setView] = createSignal<View>({ type: "List" });
   const [listMode, setListMode] = createSignal<ListMode>({ type: "Schedule" });
   const [userData, setUserData] = createSignal<UserData>(emptyUserData());
@@ -91,8 +100,33 @@ function AppSignedIn(props: {
   createEffect(() => {
     setUserData(emptyUserData());
 
-    let requestedTaskCreationFromRepeatingTasks = false;
-    let requestedDeletionForTasksWithElapsedRetention = false;
+    // The todayTimerTick() loop keeps Kit's date-based behavior updated:
+    // 1. Updates date-based UI.
+    // 2. Creates tasks from repeating tasks.
+    const submittedTaskCreations = new Set<string>();
+    let todayTimer: ReturnType<typeof setInterval> | undefined;
+    let todayTimerStopped = false;
+    const todayTimerTick = () => untrack(async () => {
+      if (todayTimerStopped) {
+        return;
+      }
+      try {
+        const newToday = taskDateToday();
+        setToday(newToday);
+        await createTasksFromRepeatingTasks(props.session.user.userId, userData(), newToday, submittedTaskCreations);
+      } catch {
+        if (todayTimerStopped) {
+          return;
+        }
+        // On any failures, we are using a super simplistic strategy for now:
+        // stop polling entirely and just ask the user to restart Kit.
+        todayTimerStopped = true;
+        clearInterval(todayTimer);
+        props.showNotice("Could not update repeating tasks. Please close and reopen Kit.");
+      }
+    });
+
+    let submittedTaskDeletions = false;
 
     const unsubscribe = subscribeUserData(props.session.user.userId, (data) => untrack(() => {
       // Close the editor if the item was deleted.
@@ -104,15 +138,14 @@ function AppSignedIn(props: {
 
       setUserData(data);
 
-      if (!requestedTaskCreationFromRepeatingTasks) {
-        requestedTaskCreationFromRepeatingTasks = true;
-        void createTasksFromRepeatingTasks(props.session.user.userId, data).catch(() => {
-          props.showNotice("Could not update repeating tasks. Please close and reopen Kit.");
-        });
+      // Until the first snapshot arrives, we don't need the todayTimerTick() loop to be running.
+      if (todayTimer === undefined) {
+        todayTimer = setInterval(todayTimerTick, 1500);
+        void todayTimerTick();
       }
 
-      if (!requestedDeletionForTasksWithElapsedRetention) {
-        requestedDeletionForTasksWithElapsedRetention = true;
+      if (!submittedTaskDeletions) {
+        submittedTaskDeletions = true;
         void deleteTasksWithElapsedRetention(props.session.user.userId, data).catch(() => {
           props.showNotice("Could not complete clean up. Please close and reopen Kit.");
         });
@@ -121,60 +154,66 @@ function AppSignedIn(props: {
       props.showNotice("There was a problem loading your data. The displayed tasks may be outdated.");
     });
 
-    onCleanup(unsubscribe);
+    onCleanup(() => {
+      todayTimerStopped = true;
+      clearInterval(todayTimer);
+      unsubscribe();
+    });
   });
 
   return (
-    <Show when={view()} keyed>
-      {(current) => {
-        switch (current.type) {
-          case "List":
-            return (
-              <List
-                userData={userData()}
-                listMode={listMode()}
-                photoUrl={props.session.user.photoUrl}
-                signOut={props.signOut}
-                setListMode={setListMode}
-                setView={setView}
-                openTaskCreator={() => setView({ type: "TaskCreator" })}
-              />
-            );
-          case "TaskCreator":
-            return (
-              <TaskCreator
-                session={props.session}
-                showNotice={props.showNotice}
-                onBack={() => setView({ type: "List" })}
-              />
-            );
-          case "TaskEditor":
-            return (
-              <Show when={userData().tasks[current.taskId]} fallback={<AppLoading />}>
-                <TaskEditor
-                  taskId={current.taskId}
+    <TodayContext.Provider value={today}>
+      <Show when={view()} keyed>
+        {(current) => {
+          switch (current.type) {
+            case "List":
+              return (
+                <List
                   userData={userData()}
+                  listMode={listMode()}
+                  photoUrl={props.session.user.photoUrl}
+                  signOut={props.signOut}
+                  setListMode={setListMode}
+                  setView={setView}
+                  openTaskCreator={() => setView({ type: "TaskCreator" })}
+                />
+              );
+            case "TaskCreator":
+              return (
+                <TaskCreator
                   session={props.session}
                   showNotice={props.showNotice}
                   onBack={() => setView({ type: "List" })}
                 />
-              </Show>
-            );
-          case "RepeatingTaskEditor":
-            return (
-              <Show when={userData().repeatingTasks[current.repeatingTaskId]} fallback={<AppLoading />}>
-                <RepeatingTaskEditor
-                  repeatingTaskId={current.repeatingTaskId}
-                  userData={userData()}
-                  session={props.session}
-                  showNotice={props.showNotice}
-                  onBack={() => setView({ type: "List" })}
-                />
-              </Show>
-            );
-        }
-      }}
-    </Show>
+              );
+            case "TaskEditor":
+              return (
+                <Show when={userData().tasks[current.taskId]} fallback={<AppLoading />}>
+                  <TaskEditor
+                    taskId={current.taskId}
+                    userData={userData()}
+                    session={props.session}
+                    showNotice={props.showNotice}
+                    onBack={() => setView({ type: "List" })}
+                  />
+                </Show>
+              );
+            case "RepeatingTaskEditor":
+              return (
+                <Show when={userData().repeatingTasks[current.repeatingTaskId]} fallback={<AppLoading />}>
+                  <RepeatingTaskEditor
+                    repeatingTaskId={current.repeatingTaskId}
+                    userData={userData()}
+                    session={props.session}
+                    showNotice={props.showNotice}
+                    onBack={() => setView({ type: "List" })}
+                  />
+                </Show>
+              );
+          }
+        }}
+      </Show>
+    </TodayContext.Provider>
   );
 }
 
@@ -455,10 +494,11 @@ function ScheduleList(props: {
   userData: UserData;
   setView: (view: View) => void;
 }) {
+  const today = useContext(TodayContext);
   return (
     <main class="px-4 mx-auto w-full max-w-lg">
       <ul role="list" class="divide-y divide-border px-4">
-        <For each={scheduleRows(props.userData)}>
+        <For each={scheduleRows(props.userData, today())}>
           {(row) => (
             <li class="py-4 first:pt-0 last:pb-0">
               {row.type === "Task" ? (
@@ -484,7 +524,7 @@ function ScheduleList(props: {
   );
 }
 
-function scheduleRows(data: UserData): ScheduleRow[] {
+function scheduleRows(data: UserData, today: TaskDate): ScheduleRow[] {
   const taskRows: ScheduleRow[] = Object.entries(data.tasks)
     .flatMap(([taskId, task]) =>
       task.completedAt === null
@@ -493,7 +533,7 @@ function scheduleRows(data: UserData): ScheduleRow[] {
     );
   const repeatingTaskRows: ScheduleRow[] = Object.entries(data.repeatingTasks)
     .flatMap(([repeatingTaskId, repeatingTask]) =>
-      occurrenceDates(repeatingTask.schedule, taskDateOneYearFromToday())
+      occurrenceDates(repeatingTask.schedule, taskDateOneYearAfter(today))
         .map((date) => ({ type: "RepeatingTask", repeatingTaskId, title: repeatingTask.title, details: repeatingTask.details, date }))
     );
   // Order tasks by date.
@@ -613,6 +653,7 @@ function TaskRow(props: {
   date: TaskDate;
   onClick: () => void;
 }) {
+  const today = useContext(TodayContext);
   return (
     <button
       class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 text-left cursor-pointer"
@@ -622,7 +663,7 @@ function TaskRow(props: {
       <span class="truncate" classList={{ "text-foreground-muted": !props.title }}>
         {props.title || "Empty title"}
       </span>
-      <time class="text-foreground-muted" dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+      <time class="text-foreground-muted" dateTime={props.date}>{formatTaskDate(props.date, today())}</time>
       <Show when={props.details}>
         <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
       </Show>
@@ -636,6 +677,7 @@ function RepeatingTaskRow(props: {
   date: TaskDate;
   onClick: () => void;
 }) {
+  const today = useContext(TodayContext);
   return (
     <button
       class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 text-left cursor-pointer"
@@ -646,7 +688,7 @@ function RepeatingTaskRow(props: {
         {props.title || "Empty title"}
       </span>
       <span class="text-foreground-muted">
-        <span role="img" aria-label="Repeating task">↻</span> <time dateTime={props.date}>{formatTaskDate(props.date, taskDateToday())}</time>
+        <span role="img" aria-label="Repeating task">↻</span> <time dateTime={props.date}>{formatTaskDate(props.date, today())}</time>
       </span>
       <Show when={props.details}>
         <span class="col-span-2 truncate text-sm text-foreground-muted">{props.details}</span>
@@ -660,6 +702,7 @@ function CompletedTaskRow(props: {
   completedAt: Timestamp;
   onClick: () => void;
 }) {
+  const today = useContext(TodayContext);
   const completedDate = () => props.completedAt.toDate();
   return (
     <button
@@ -671,7 +714,7 @@ function CompletedTaskRow(props: {
         {props.title || "Empty title"}
       </span>
       <time class="truncate text-sm text-foreground-muted" dateTime={completedDate().toISOString()}>
-        Completed {formatTaskDate(taskDateFromDate(completedDate()), taskDateToday())}
+        Completed {formatTaskDate(taskDateFromDate(completedDate()), today())}
       </time>
     </button>
   );

@@ -3,13 +3,13 @@ import Fieldset from "./components/Fieldset";
 import Input from "./components/Input";
 import Select from "./components/Select";
 import TextArea from "./components/TextArea";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show, useContext } from "solid-js";
 import IconButton from "./components/IconButton";
 import TextButton from "./components/TextButton";
 import { isSaveShortcut } from "./shortcuts";
 import { maxInterval, type IntervalUnit } from "./repeatingTask";
 import type { SignedIn } from "./session";
-import { decodeTaskDate, taskDateOneYearFromToday, taskDateToday, type TaskDate } from "./taskDate";
+import { TodayContext, decodeTaskDate, taskDateOneYearAfter, taskDateToday, type TaskDate } from "./taskDate";
 import { createRepeatingTask, createTask } from "./userData";
 
 export default function TaskCreator(props: {
@@ -17,14 +17,17 @@ export default function TaskCreator(props: {
   showNotice: (message: string) => void;
   onBack: () => void;
 }) {
+  // Use this for UI that needs to be updated when today's date changes.
+  const today = useContext(TodayContext);
+
   const [title, setTitle] = createSignal("");
   const [details, setDetails] = createSignal("");
   const [repeats, setRepeats] = createSignal(false);
   const [date, setDate] = createSignal<string>(taskDateToday());
   const [interval, setInterval] = createSignal(1);
   const [intervalUnit, setIntervalUnit] = createSignal<IntervalUnit>("Days");
-  let titleInput!: HTMLInputElement;
 
+  let titleInput!: HTMLInputElement;
   onMount(() => titleInput.focus());
 
   function changeIntervalUnit(unit: IntervalUnit) {
@@ -40,7 +43,7 @@ export default function TaskCreator(props: {
       props.showNotice("A date is required.");
       return;
     }
-    if (validatedDate > taskDateOneYearFromToday()) {
+    if (validatedDate > taskDateOneYearAfter(taskDateToday())) {
       props.showNotice("The date cannot be more than 1 year in the future.");
       return;
     }
@@ -103,7 +106,7 @@ export default function TaskCreator(props: {
         <Input
           name="date"
           type="date"
-          max={taskDateOneYearFromToday()}
+          max={taskDateOneYearAfter(today())}
           value={date()}
           onInput={(event) => setDate(event.currentTarget.value)}
         />
